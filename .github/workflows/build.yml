@@ -1,0 +1,72 @@
+name: 构建安装包
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:   # 允许手动点击触发
+
+jobs:
+  # ── Mac 版：生成 .dmg ─────────────────────────────────
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: 打包 .app
+        run: pyinstaller zhanno.spec --noconfirm
+
+      - name: 制作 .dmg
+        run: |
+          mkdir /tmp/zhanno_dmg
+          cp -r "dist/湛诺财务系统.app" /tmp/zhanno_dmg/
+          ln -sf /Applications /tmp/zhanno_dmg/Applications
+          hdiutil create \
+            -volname "湛诺财务系统 v1.0" \
+            -srcfolder /tmp/zhanno_dmg \
+            -ov -format UDZO \
+            "dist/湛诺财务系统_v1.0_Mac.dmg"
+
+      - name: 上传 Mac 安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: 湛诺财务系统_Mac
+          path: dist/湛诺财务系统_v1.0_Mac.dmg
+          retention-days: 30
+
+  # ── Windows 版：生成 .exe 安装包 ──────────────────────
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: 打包 .exe
+        run: pyinstaller zhanno.spec --noconfirm
+
+      - name: 制作安装包 (zip)
+        run: |
+          cd dist
+          Compress-Archive -Path "湛诺财务系统" -DestinationPath "湛诺财务系统_v1.0_Windows.zip"
+        shell: pwsh
+
+      - name: 上传 Windows 安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: 湛诺财务系统_Windows
+          path: dist/湛诺财务系统_v1.0_Windows.zip
+          retention-days: 30

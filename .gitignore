@@ -1,0 +1,15 @@
+.env
+*.db
+*.db-shm
+*.db-wal
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.pdf
+build/
+dist/
+*.spec.bak
+.DS_Store
+.claude/

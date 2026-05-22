@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>湛诺财务系统</title>
+  <script src="/static/tailwind.js"></script>
+  <script defer src="/static/alpine.min.js"></script>
+  <style>
+    [x-cloak]{display:none!important}
+    .nav-item{@apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-all cursor-pointer text-sm font-medium}
+    body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+    .card{@apply bg-white rounded-2xl shadow-sm border border-slate-100 p-5}
+    ::-webkit-scrollbar{width:5px;height:5px}
+    ::-webkit-scrollbar-track{background:#f1f5f9}
+    ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800" x-data="app()" x-init="init()" x-cloak>
+
+<!-- ── 登录页 ──────────────────────────────────────────── -->
+<div x-show="!token" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-950 to-slate-800">
+  <div class="w-full max-w-sm mx-4">
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 mb-4 shadow-lg">
+        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+      </div>
+      <h1 class="text-2xl font-bold text-white">湛诺财务系统</h1>
+      <p class="text-slate-400 text-sm mt-1">AI 自然语言记账 · 数据本地私密</p>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-2xl p-8">
+      <div x-show="loginError" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 mb-4 text-sm" x-text="loginError"></div>
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-slate-600 mb-1.5">用户名</label>
+        <input type="text" x-model="loginUsername" @keydown.enter="login()"
+          class="w-full border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+          placeholder="输入用户名" autocomplete="username" />
+      </div>
+
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-slate-600 mb-1.5">密码</label>
+        <input type="password" x-model="loginPassword" @keydown.enter="login()"
+          class="w-full border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+          placeholder="输入密码" />
+      </div>
+
+      <button @click="login()" :disabled="loginLoading"
+        class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg py-2.5 transition-colors text-sm">
+        <span x-show="!loginLoading">登 录</span>
+        <span x-show="loginLoading">登录中...</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 主应用 ──────────────────────────────────────────── -->
+<div x-show="token" class="flex h-screen overflow-hidden">
+
+  <!-- 侧边栏 (桌面) -->
+  <aside class="hidden lg:flex flex-col w-60 bg-slate-900 shrink-0">
+    <div class="px-5 py-5 border-b border-slate-700">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div>
+          <div class="text-white font-semibold text-sm">湛诺财务</div>
+          <div class="text-slate-400 text-xs" x-text="currentUser?.username + ' · ' + (currentUser?.role==='admin'?'记账':'只读')"></div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <template x-for="item in navItems" :key="item.page">
+        <div x-show="!item.adminOnly || isAdmin"
+          @click="navigate(item.page)"
+          :class="currentPage===item.page ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white'"
+          class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all cursor-pointer text-sm font-medium">
+          <span x-html="item.icon" class="shrink-0"></span>
+          <span x-text="item.label"></span>
+        </div>
+      </template>
+    </nav>
+
+    <div class="px-3 py-4 border-t border-slate-700 space-y-1">
+      <div @click="navigate('password')" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-400 hover:bg-slate-700 hover:text-white transition-all cursor-pointer text-sm">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+        <span>修改密码</span>
+      </div>
+      <div @click="logout()" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-400 hover:bg-red-900 hover:text-red-300 transition-all cursor-pointer text-sm">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        <span>退出登录</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 主内容区 -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <!-- 顶栏 (移动端) -->
+    <header class="lg:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+      <button @click="mobileMenuOpen=!mobileMenuOpen" class="p-2 rounded-lg hover:bg-slate-100">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <span class="font-semibold text-slate-700" x-text="navItems.find(n=>n.page===currentPage)?.label || '湛诺财务'"></span>
+      <span class="text-sm text-slate-500" x-text="currentUser?.username"></span>
+    </header>
+
+    <!-- 移动端菜单 -->
+    <div x-show="mobileMenuOpen" @click.outside="mobileMenuOpen=false"
+      class="lg:hidden absolute inset-0 z-50 bg-black/40" x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
+      <div class="w-64 h-full bg-slate-900 shadow-xl" @click.stop>
+        <div class="px-4 py-5 border-b border-slate-700">
+          <div class="font-bold text-white">湛诺财务系统</div>
+          <div class="text-xs text-slate-400 mt-0.5" x-text="currentUser?.username + ' · ' + (currentUser?.role==='admin'?'记账':'只读')"></div>
+        </div>
+        <nav class="px-3 py-4 space-y-1">
+          <template x-for="item in navItems" :key="item.page">
+            <div x-show="!item.adminOnly || isAdmin"
+              @click="navigate(item.page); mobileMenuOpen=false"
+              :class="currentPage===item.page ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white'"
+              class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all cursor-pointer text-sm font-medium">
+              <span x-html="item.icon"></span>
+              <span x-text="item.label"></span>
+            </div>
+          </template>
+          <div @click="navigate('password');mobileMenuOpen=false" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-400 hover:bg-slate-700 hover:text-white cursor-pointer text-sm">修改密码</div>
+          <div @click="logout()" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-red-400 hover:bg-red-900 cursor-pointer text-sm">退出</div>
+        </nav>
+      </div>
+    </div>
+
+    <!-- 页面内容 -->
+    <main class="flex-1 overflow-y-auto p-4 lg:p-6">
+
+      <!-- 仪表板 -->
+      <div x-show="currentPage==='dashboard'">
+        <h2 class="text-lg font-bold mb-4 text-slate-700">本月概览
+          <span class="text-sm font-normal text-slate-400 ml-2" x-text="currentYearMonth"></span>
+        </h2>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+          <div class="card">
+            <div class="text-xs text-slate-400 mb-1">本月支出</div>
+            <div class="text-xl font-bold text-slate-800" x-text="fmt(summary?.total||0)"></div>
+            <div class="text-xs text-slate-400 mt-1" x-text="(summary?.count||0)+'笔'"></div>
+          </div>
+          <div class="card">
+            <div class="text-xs text-slate-400 mb-1">最大单笔</div>
+            <div class="text-xl font-bold text-amber-600" x-text="fmt(summary?.max_amount||0)"></div>
+          </div>
+          <template x-for="[h,amt] in topHandlers" :key="h">
+            <div class="card">
+              <div class="text-xs text-slate-400 mb-1" x-text="h+' 支出'"></div>
+              <div class="text-xl font-bold text-blue-600" x-text="fmt(amt)"></div>
+            </div>
+          </template>
+        </div>
+
+        <!-- 分类支出条形图 -->
+        <div class="card mb-6" x-show="byCatList.length">
+          <div class="font-semibold text-sm text-slate-600 mb-3">分类支出分布</div>
+          <div class="space-y-2.5">
+            <template x-for="item in byCatList" :key="item.name">
+              <div>
+                <div class="flex justify-between text-xs text-slate-500 mb-1">
+                  <span x-text="item.name"></span>
+                  <span x-text="fmt(item.amount)"></span>
+                </div>
+                <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-blue-500 rounded-full transition-all duration-500"
+                    :style="'width:'+((summary.total>0?item.amount/summary.total:0)*100).toFixed(1)+'%'"></div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 最近记录 -->
+        <div class="card">
+          <div class="font-semibold text-sm text-slate-600 mb-3">最近 10 条</div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="text-xs text-slate-400 border-b border-slate-100">
+                <th class="text-left pb-2">日期</th><th class="text-left pb-2">分类</th>
+                <th class="text-left pb-2">经手人</th><th class="text-right pb-2">金额</th>
+              </tr></thead>
+              <tbody>
+                <template x-for="t in transactions.slice(0,10)" :key="t.id">
+                  <tr class="border-b border-slate-50 hover:bg-slate-50">
+                    <td class="py-2 text-slate-500 text-xs" x-text="t.transaction_date"></td>
+                    <td class="py-2">
+                      <span class="px-2 py-0.5 rounded-full text-xs font-medium"
+                        :style="'background:'+catColor(t.category_name)+'20;color:'+catColor(t.category_name)"
+                        x-text="t.category_name"></span>
+                    </td>
+                    <td class="py-2 font-semibold text-slate-700" x-text="t.handler"></td>
+                    <td class="py-2 text-right font-semibold text-slate-800" x-text="fmt(t.amount)"></td>
+                  </tr>
+                </template>
+                <tr x-show="!transactions.length"><td colspan="4" class="py-6 text-center text-slate-400 text-sm">本月暂无记录</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 快速记账 -->
+      <div x-show="currentPage==='quickadd'" x-show="isAdmin">
+        <h2 class="text-lg font-bold mb-4 text-slate-700">快速记账</h2>
+
+        <div x-show="!aiSettings.api_key_set"
+          class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
+          <svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+          <div class="flex-1 text-sm">
+            <span class="font-medium text-amber-800">AI 未配置</span>
+            <span class="text-amber-600 ml-1">— 请先在「系统设置」填写 API Key</span>
+          </div>
+          <button @click="navigate('settings')" class="text-xs text-amber-700 font-semibold bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors">去配置</button>
+        </div>
+
+        <div x-show="!confirmMode" class="card">
+          <div class="text-sm text-slate-500 mb-3">用一句话描述这笔支出，AI 自动提取信息</div>
+          <textarea x-model="quickInput" rows="3"
+            class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            placeholder="例如：今天 H 请客户吃饭花了 1500&#10;S1 上午交了 3000 商业咨询费"></textarea>
+
+          <div class="mt-3 flex gap-2">
+            <button @click="parseInput()" :disabled="quickLoading || !quickInput.trim()"
+              class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold rounded-xl py-2.5 text-sm transition-colors">
+              <span x-show="!quickLoading">✨ AI 智能解析</span>
+              <span x-show="quickLoading">解析中...</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 确认卡片 -->
+        <div x-show="confirmMode" class="card border-2 border-blue-200">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center">
+              <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <span class="text-sm font-semibold text-blue-700">AI 解析完成，请确认信息</span>
+          </div>
+
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">金额（元）</label>
+              <input type="number" x-model="parsedAmount" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">分类</label>
+              <select x-model="parsedCategoryId" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <template x-for="c in categories" :key="c.id">
+                  <option :value="c.id" x-text="c.name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">经手人</label>
+              <select x-model="parsedHandler" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="H">H</option><option value="S1">S1</option>
+                <option value="W">W</option><option value="S2">S2</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">日期</label>
+              <input type="date" x-model="parsedDate" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div class="sm:col-span-2">
+              <label class="block text-xs text-slate-500 mb-1">备注</label>
+              <input type="text" x-model="parsedDesc" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+
+          <div class="flex gap-2 mt-4">
+            <button @click="confirmTransaction()" :disabled="confirmLoading"
+              class="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold rounded-xl py-2.5 text-sm">
+              <span x-show="!confirmLoading">✓ 确认入账</span>
+              <span x-show="confirmLoading">提交中...</span>
+            </button>
+            <button @click="cancelConfirm()" class="px-5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">重新输入</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 账目明细 -->
+      <div x-show="currentPage==='transactions'">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+          <h2 class="text-lg font-bold text-slate-700 flex-1">账目明细</h2>
+          <div class="flex flex-wrap gap-2">
+            <select x-model="filterHandler" @change="loadTransactions()" class="border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">全部经手人</option>
+              <option>H</option><option>S1</option><option>W</option><option>S2</option>
+            </select>
+            <select x-model="filterCategoryId" @change="loadTransactions()" class="border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">全部分类</option>
+              <template x-for="c in categories" :key="c.id">
+                <option :value="c.id" x-text="c.name"></option>
+              </template>
+            </select>
+            <input type="number" x-model="filterYear" @change="loadTransactions()" placeholder="年份" class="w-20 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <select x-model="filterMonth" @change="loadTransactions()" class="border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">全部月份</option>
+              <template x-for="m in 12" :key="m"><option :value="m" x-text="m+'月'"></option></template>
+            </select>
+            <button @click="filterHandler='';filterCategoryId='';filterYear=new Date().getFullYear();filterMonth=new Date().getMonth()+1;loadTransactions()" class="px-3 py-1.5 text-xs text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50">重置</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="text-xs text-slate-400 mb-3" x-text="transactions.length + ' 条记录'"></div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="text-xs text-slate-400 border-b border-slate-100">
+                <th class="text-left pb-3">日期</th>
+                <th class="text-left pb-3">分类</th>
+                <th class="text-left pb-3">经手人</th>
+                <th class="text-left pb-3">备注</th>
+                <th class="text-right pb-3">金额</th>
+                <th x-show="isAdmin" class="text-right pb-3">操作</th>
+              </tr></thead>
+              <tbody>
+                <template x-for="t in transactions" :key="t.id">
+                  <tr class="border-b border-slate-50 hover:bg-slate-50 group">
+                    <td class="py-2.5 text-slate-500 text-xs whitespace-nowrap" x-text="t.transaction_date"></td>
+                    <td class="py-2.5">
+                      <span class="px-2 py-0.5 rounded-full text-xs font-medium"
+                        :style="'background:'+catColor(t.category_name)+'20;color:'+catColor(t.category_name)"
+                        x-text="t.category_name"></span>
+                    </td>
+                    <td class="py-2.5 font-semibold" x-text="t.handler"></td>
+                    <td class="py-2.5 text-slate-500 text-xs max-w-xs truncate" x-text="t.description||'—'"></td>
+                    <td class="py-2.5 text-right font-semibold" x-text="fmt(t.amount)"></td>
+                    <td x-show="isAdmin" class="py-2.5 text-right">
+                      <button @click="deleteTransaction(t.id)" class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 text-xs px-2 py-1 rounded transition-all">删除</button>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="!transactions.length">
+                  <td colspan="6" class="py-10 text-center text-slate-400">暂无记录</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI 查询 -->
+      <div x-show="currentPage==='aiquery'">
+        <h2 class="text-lg font-bold mb-4 text-slate-700">AI 智能查询</h2>
+
+        <div x-show="!aiSettings.api_key_set"
+          class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
+          <svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+          <div class="flex-1 text-sm">
+            <span class="font-medium text-amber-800">AI 未配置</span>
+            <span class="text-amber-600 ml-1">— 请先在「系统设置」填写 API Key</span>
+          </div>
+          <button @click="navigate('settings')" class="text-xs text-amber-700 font-semibold bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors">去配置</button>
+        </div>
+
+        <div class="card mb-4">
+          <div class="text-sm text-slate-500 mb-3">用自然语言提问，AI 自动转换为数据库查询</div>
+          <div class="flex gap-2">
+            <input type="text" x-model="queryInput" @keydown.enter="runQuery()"
+              class="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="例如：S1 上个月花了多少？本月各分类支出？H 本年度垫资了多少？" />
+            <button @click="runQuery()" :disabled="queryLoading || !queryInput.trim()"
+              class="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold rounded-xl px-5 text-sm transition-colors whitespace-nowrap">
+              <span x-show="!queryLoading">查询</span>
+              <span x-show="queryLoading">...</span>
+            </button>
+          </div>
+
+          <div class="flex flex-wrap gap-2 mt-3">
+            <template x-for="q in quickQueries" :key="q">
+              <button @click="queryInput=q;runQuery()" class="text-xs px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 transition-colors" x-text="q"></button>
+            </template>
+          </div>
+        </div>
+
+        <div x-show="queryResult" class="space-y-4">
+          <!-- SQL 显示 -->
+          <div class="card">
+            <div class="flex items-center justify-between cursor-pointer" @click="showSQL=!showSQL">
+              <span class="text-xs text-slate-400">生成的 SQL</span>
+              <span class="text-xs text-blue-500" x-text="showSQL?'收起':'展开'"></span>
+            </div>
+            <pre x-show="showSQL" class="mt-2 text-xs bg-slate-800 text-green-400 rounded-lg p-3 overflow-x-auto" x-text="queryResult?.sql"></pre>
+          </div>
+
+          <!-- 结果表 -->
+          <div class="card">
+            <div class="text-xs text-slate-400 mb-3" x-text="(queryResult?.data?.length||0) + ' 条结果'"></div>
+            <div x-show="queryResult?.data?.length" class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="text-xs text-slate-400 border-b border-slate-100">
+                    <template x-for="col in queryResult?.columns||[]" :key="col">
+                      <th class="text-left pb-2 pr-4" x-text="col"></th>
+                    </template>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="(row,i) in queryResult?.data||[]" :key="i">
+                    <tr class="border-b border-slate-50 hover:bg-slate-50">
+                      <template x-for="col in queryResult?.columns||[]" :key="col">
+                        <td class="py-2 pr-4" x-text="formatCell(row[col])"></td>
+                      </template>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="queryResult?.data?.length===0" class="text-center text-slate-400 py-6 text-sm">无数据</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 分类管理 -->
+      <div x-show="currentPage==='categories'">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-bold text-slate-700">分类管理</h2>
+          <button x-show="isAdmin" @click="openAddCategory()"
+            class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl px-4 py-2 transition-colors">+ 新增分类</button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <template x-for="cat in categories" :key="cat.id">
+            <div class="card flex items-start gap-3">
+              <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-white font-bold text-sm"
+                :style="'background:'+cat.color" x-text="cat.name.charAt(0)"></div>
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold text-sm" x-text="cat.name"></div>
+                <div class="text-xs text-slate-400 mt-0.5" x-text="cat.description||'—'"></div>
+                <div class="text-xs mt-1">
+                  <span x-show="cat.is_system" class="text-blue-500">系统内置</span>
+                  <span x-show="!cat.is_system" class="text-slate-400">自定义</span>
+                </div>
+              </div>
+              <div x-show="isAdmin" class="flex gap-1 shrink-0">
+                <button @click="openEditCategory(cat)" class="text-xs text-blue-500 hover:text-blue-700 px-2 py-1 rounded">编辑</button>
+                <button x-show="!cat.is_system" @click="deleteCategory(cat.id)" class="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded">删除</button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 月报导出 -->
+      <div x-show="currentPage==='reports'">
+        <h2 class="text-lg font-bold mb-4 text-slate-700">月报导出</h2>
+        <div class="max-w-md card">
+          <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs text-slate-500 mb-1.5">年份</label>
+                <input type="number" x-model="reportYear" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label class="block text-xs text-slate-500 mb-1.5">月份</label>
+                <select x-model="reportMonth" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <template x-for="m in 12" :key="m"><option :value="m" x-text="m+'月'"></option></template>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs text-slate-500 mb-1.5">PDF 密码（可选）</label>
+              <input type="text" x-model="reportPassword"
+                class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="留空则不加密" />
+              <div class="text-xs text-slate-400 mt-1">设置密码后，PDF 加密保护，适合发给只读合伙人</div>
+            </div>
+
+            <button @click="generateReport()" :disabled="reportLoading"
+              class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-xl py-2.5 text-sm transition-colors">
+              <span x-show="!reportLoading">📄 生成并下载 PDF</span>
+              <span x-show="reportLoading">生成中，请稍候...</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 系统设置 -->
+      <div x-show="currentPage==='settings'">
+        <h2 class="text-lg font-bold mb-4 text-slate-700">系统设置</h2>
+
+        <!-- AI 接口配置 -->
+        <div class="max-w-lg card mb-4">
+          <div class="flex items-center gap-2 mb-4">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+            <span class="font-semibold text-slate-700">AI 接口配置</span>
+          </div>
+
+          <div class="mb-4 px-3 py-2.5 rounded-xl text-sm flex items-center gap-2"
+            :class="aiSettings.api_key_set ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'">
+            <span x-show="aiSettings.api_key_set">
+              ✓ AI 已配置
+              <span class="opacity-60 ml-1 text-xs" x-text="'(' + aiSettings.api_key_preview + ')'"></span>
+            </span>
+            <span x-show="!aiSettings.api_key_set">⚠ AI 未配置，请填写 API Key</span>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1.5">AI 服务商</label>
+              <select x-model="aiProviderInput" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="minimax">MiniMax（国内，推荐）</option>
+                <option value="deepseek">DeepSeek（国内，价格极低）</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs text-slate-500 mb-1.5">API Key
+                <span class="text-slate-400 font-normal ml-1">（留空则不更新现有配置）</span>
+              </label>
+              <input type="text" x-model="aiKeyInput"
+                class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                placeholder="填写新 Key 才会更新，留空保持原配置" autocomplete="off" />
+            </div>
+
+            <div x-show="aiProviderInput === 'minimax'">
+              <label class="block text-xs text-slate-500 mb-1.5">Group ID
+                <span class="text-slate-400 font-normal ml-1">（MiniMax 专用，可选）</span>
+              </label>
+              <input type="text" x-model="aiGroupIdInput"
+                class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                placeholder="可选" autocomplete="off" />
+            </div>
+
+            <div class="flex gap-2 pt-1">
+              <button @click="saveAISettings()" :disabled="settingsLoading"
+                class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold rounded-xl py-2.5 text-sm transition-colors">
+                <span x-show="!settingsLoading">保存设置</span>
+                <span x-show="settingsLoading">保存中...</span>
+              </button>
+              <button @click="testAIConnection()" :disabled="settingsLoading || !aiSettings.api_key_set"
+                class="px-5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                测试连接
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 用户管理（仅管理员） -->
+        <div class="max-w-lg card mb-4" x-show="currentUser && currentUser.role==='admin'">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+              <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              <span class="font-semibold text-slate-700">用户管理</span>
+            </div>
+            <button @click="showAddUser=!showAddUser"
+              class="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg transition-colors">
+              + 新增用户
+            </button>
+          </div>
+
+          <!-- 新增用户表单 -->
+          <div x-show="showAddUser" x-transition class="bg-slate-50 rounded-xl p-4 mb-4 space-y-3">
+            <div class="text-xs font-semibold text-slate-600 mb-2">新增用户</div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs text-slate-500 mb-1">用户名</label>
+                <input type="text" x-model="newUser.username" placeholder="2-10个字符"
+                  class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+              </div>
+              <div>
+                <label class="block text-xs text-slate-500 mb-1">角色</label>
+                <select x-model="newUser.role" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                  <option value="admin">管理员（可增删改）</option>
+                  <option value="readonly">只读（仅查看）</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">初始密码（至少6位）</label>
+              <input type="password" x-model="newUser.password" placeholder="设置初始密码"
+                class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+            </div>
+            <div class="flex gap-2 pt-1">
+              <button @click="createUser()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg py-2 transition-colors">创建</button>
+              <button @click="showAddUser=false; newUser={username:'',password:'',role:'readonly'}" class="px-4 border border-slate-200 rounded-lg text-sm text-slate-500 hover:bg-slate-100 transition-colors">取消</button>
+            </div>
+          </div>
+
+          <!-- 用户列表 -->
+          <div class="space-y-2">
+            <template x-for="u in userList" :key="u.id">
+              <div class="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold"
+                    :class="u.role==='admin' ? 'bg-purple-500' : 'bg-slate-400'"
+                    x-text="u.username.slice(0,1).toUpperCase()"></div>
+                  <div>
+                    <div class="text-sm font-medium text-slate-700" x-text="u.username"></div>
+                    <div class="text-xs text-slate-400" x-text="u.role==='admin' ? '管理员' : '只读'"></div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2" x-show="u.id !== currentUser?.id">
+                  <button @click="promptResetPwd(u)"
+                    class="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors">重置密码</button>
+                  <button @click="toggleUserRole(u)"
+                    class="text-xs text-amber-600 hover:text-amber-800 px-2 py-1 rounded hover:bg-amber-50 transition-colors"
+                    x-text="u.role==='admin' ? '改为只读' : '改为管理员'"></button>
+                  <button @click="deleteUser(u)"
+                    class="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors">删除</button>
+                </div>
+                <div class="text-xs text-slate-400 italic" x-show="u.id === currentUser?.id">当前账号</div>
+              </div>
+            </template>
+            <div x-show="userList.length===0" class="text-center text-sm text-slate-400 py-4">暂无用户</div>
+          </div>
+        </div>
+
+        <!-- 关于 -->
+        <div class="max-w-lg card">
+          <div class="flex items-center gap-2 mb-3">
+            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="font-semibold text-slate-600 text-sm">关于</span>
+          </div>
+          <div class="text-sm text-slate-500 space-y-1.5">
+            <div>湛诺财务系统 <span class="text-slate-400 text-xs">v1.0</span></div>
+            <div class="text-xs text-slate-400">数据本地存储，永不上传云端</div>
+            <div class="text-xs text-slate-400">AI 自然语言记账 · 支持 MiniMax / DeepSeek</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 修改密码 -->
+      <div x-show="currentPage==='password'">
+        <h2 class="text-lg font-bold mb-4 text-slate-700">修改密码</h2>
+        <div class="max-w-sm card">
+          <div x-show="pwMsg" :class="pwOk?'text-green-600 bg-green-50':'text-red-600 bg-red-50'"
+            class="rounded-lg px-4 py-2.5 mb-4 text-sm" x-text="pwMsg"></div>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1.5">当前密码</label>
+              <input type="password" x-model="pwOld" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1.5">新密码（至少6位）</label>
+              <input type="password" x-model="pwNew" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <button @click="changePassword()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-2.5 text-sm transition-colors">确认修改</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- 分类弹窗 -->
+<div x-show="showCatModal" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+  <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm" @click.stop>
+    <h3 class="font-bold text-slate-700 mb-4" x-text="editingCat?'编辑分类':'新增分类'"></h3>
+    <div class="space-y-3">
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">分类名称</label>
+        <input type="text" x-model="catForm.name" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">描述</label>
+        <input type="text" x-model="catForm.description" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">颜色</label>
+        <div class="flex items-center gap-3">
+          <input type="color" x-model="catForm.color" class="w-10 h-9 rounded cursor-pointer border border-slate-200" />
+          <span class="text-sm text-slate-500" x-text="catForm.color"></span>
+        </div>
+      </div>
+    </div>
+    <div class="flex gap-2 mt-5">
+      <button @click="saveCategory()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-2.5 text-sm">保存</button>
+      <button @click="showCatModal=false" class="px-5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast 通知 -->
+<div x-show="toast.show" x-transition
+  :class="toast.type==='success' ? 'bg-green-600' : 'bg-red-600'"
+  class="fixed bottom-6 left-1/2 -translate-x-1/2 text-white px-5 py-3 rounded-2xl shadow-xl text-sm font-medium z-50 whitespace-nowrap">
+  <span x-text="toast.msg"></span>
+</div>
+
+<script>
+function app() {
+  const today = new Date();
+  return {
+    // ── 状态 ──
+    token: null,
+    currentUser: null,
+    currentPage: 'dashboard',
+    mobileMenuOpen: false,
+
+    // 登录
+    loginUsername: '',
+    loginPassword: '',
+    loginError: '',
+    loginLoading: false,
+
+    // 数据
+    categories: [],
+    transactions: [],
+    summary: null,
+
+    // 筛选
+    filterHandler: '',
+    filterCategoryId: '',
+    filterYear: today.getFullYear(),
+    filterMonth: today.getMonth() + 1,
+
+    // 快速记账
+    quickInput: '',
+    confirmMode: false,
+    quickLoading: false,
+    confirmLoading: false,
+    parsedAmount: 0,
+    parsedCategoryId: null,
+    parsedHandler: 'H',
+    parsedDate: '',
+    parsedDesc: '',
+
+    // AI 查询
+    queryInput: '',
+    queryResult: null,
+    queryLoading: false,
+    showSQL: false,
+    quickQueries: [
+      'H 上个月花了多少？',
+      '本月各分类支出汇总',
+      '本年度内部垫资合计',
+      'S1 本月客户招待费',
+    ],
+
+    // 分类
+    showCatModal: false,
+    editingCat: null,
+    catForm: { name: '', description: '', color: '#3B82F6' },
+
+    // 报告
+    reportYear: today.getFullYear(),
+    reportMonth: today.getMonth() + 1,
+    reportPassword: '',
+    reportLoading: false,
+
+    // 改密
+    pwOld: '',
+    pwNew: '',
+    pwMsg: '',
+    pwOk: false,
+
+    // 系统设置
+    aiSettings: { provider: 'minimax', api_key_set: false, api_key_preview: '', group_id: '' },
+    aiKeyInput: '',
+    aiGroupIdInput: '',
+    aiProviderInput: 'minimax',
+    settingsLoading: false,
+
+    // 用户管理
+    userList: [],
+    showAddUser: false,
+    newUser: { username: '', password: '', role: 'readonly' },
+
+    // Toast
+    toast: { show: false, msg: '', type: 'success' },
+
+    // 导航
+    navItems: [
+      { page: 'dashboard',    label: '仪表板',  adminOnly: false, icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>' },
+      { page: 'quickadd',     label: '快速记账', adminOnly: true,  icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>' },
+      { page: 'transactions', label: '账目明细', adminOnly: false, icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>' },
+      { page: 'aiquery',      label: 'AI 查询',  adminOnly: false, icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>' },
+      { page: 'categories',   label: '分类管理', adminOnly: false, icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>' },
+      { page: 'reports',      label: '月报导出', adminOnly: false, icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>' },
+      { page: 'settings',     label: '系统设置', adminOnly: true,  icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>' },
+    ],
+
+    // ── 计算属性 ──
+    get isAdmin() { return this.currentUser?.role === 'admin'; },
+    get currentYearMonth() {
+      const n = new Date();
+      return `${n.getFullYear()}年${n.getMonth()+1}月`;
+    },
+    get byCatList() {
+      if (!this.summary?.by_category) return [];
+      return Object.entries(this.summary.by_category)
+        .map(([name, amount]) => ({ name, amount }))
+        .sort((a, b) => b.amount - a.amount);
+    },
+    get topHandlers() {
+      if (!this.summary?.by_handler) return [];
+      return Object.entries(this.summary.by_handler).slice(0, 2);
+    },
+
+    // ── 方法 ──
+    async init() {
+      const t = localStorage.getItem('zn_token');
+      const u = localStorage.getItem('zn_user');
+      if (t) {
+        this.token = t;
+        this.currentUser = JSON.parse(u || 'null');
+        try { await this._loadAll(); } catch { this.logout(); }
+      }
+    },
+
+    async _loadAll() {
+      const n = new Date();
+      await Promise.all([
+        this.loadCategories(),
+        this.loadTransactions(),
+        this.loadSummary(n.getFullYear(), n.getMonth() + 1),
+        this.loadAISettings(),
+      ]);
+    },
+
+    async api(path, opts = {}) {
+      const res = await fetch(path, {
+        ...opts,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
+          ...(opts.headers || {}),
+        },
+      });
+      if (res.status === 401) { this.logout(); throw new Error('未授权'); }
+      return res;
+    },
+
+    async login() {
+      this.loginLoading = true; this.loginError = '';
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: this.loginUsername, password: this.loginPassword }),
+        });
+        if (!res.ok) { this.loginError = (await res.json()).detail || '登录失败'; return; }
+        const d = await res.json();
+        this.token = d.access_token;
+        this.currentUser = d.user;
+        localStorage.setItem('zn_token', this.token);
+        localStorage.setItem('zn_user', JSON.stringify(d.user));
+        await this._loadAll();
+      } catch { this.loginError = '网络错误'; }
+      finally { this.loginLoading = false; }
+    },
+
+    logout() {
+      this.token = null; this.currentUser = null;
+      localStorage.removeItem('zn_token'); localStorage.removeItem('zn_user');
+    },
+
+    async loadCategories() {
+      const res = await this.api('/api/categories/');
+      this.categories = await res.json();
+    },
+
+    async loadTransactions() {
+      const p = new URLSearchParams();
+      if (this.filterHandler)    p.set('handler',     this.filterHandler);
+      if (this.filterCategoryId) p.set('category_id', this.filterCategoryId);
+      if (this.filterYear)       p.set('year',        this.filterYear);
+      if (this.filterMonth)      p.set('month',       this.filterMonth);
+      const res = await this.api('/api/transactions/?' + p.toString());
+      this.transactions = await res.json();
+    },
+
+    async loadSummary(year, month) {
+      const res = await this.api(`/api/transactions/summary?year=${year}&month=${month}`);
+      this.summary = await res.json();
+    },
+
+    navigate(page) {
+      this.currentPage = page;
+      this.mobileMenuOpen = false;
+      if (page === 'transactions') this.loadTransactions();
+      if (page === 'settings') { this.loadAISettings(); this.loadUsers(); }
+    },
+
+    async parseInput() {
+      if (!this.quickInput.trim()) return;
+      this.quickLoading = true;
+      try {
+        const res = await this.api('/api/ai/parse-transaction', {
+          method: 'POST', body: JSON.stringify({ text: this.quickInput }),
+        });
+        if (!res.ok) { this.showToast((await res.json()).detail || 'AI 解析失败', 'error'); return; }
+        const d = await res.json();
+        this.parsedAmount     = d.amount;
+        this.parsedCategoryId = d.category_id;
+        this.parsedHandler    = d.handler || 'H';
+        this.parsedDate       = d.date;
+        this.parsedDesc       = d.description;
+        this.confirmMode = true;
+      } catch(e) { this.showToast('AI 解析失败: ' + e.message, 'error'); }
+      finally { this.quickLoading = false; }
+    },
+
+    async confirmTransaction() {
+      this.confirmLoading = true;
+      try {
+        const res = await this.api('/api/transactions/', {
+          method: 'POST',
+          body: JSON.stringify({
+            amount: parseFloat(this.parsedAmount),
+            category_id: parseInt(this.parsedCategoryId),
+            handler: this.parsedHandler,
+            description: this.parsedDesc,
+            transaction_date: this.parsedDate,
+          }),
+        });
+        if (!res.ok) { this.showToast((await res.json()).detail || '入账失败', 'error'); return; }
+        this.showToast('入账成功！', 'success');
+        this.quickInput = ''; this.confirmMode = false;
+        const n = new Date();
+        await Promise.all([this.loadTransactions(), this.loadSummary(n.getFullYear(), n.getMonth()+1)]);
+      } catch { this.showToast('入账失败', 'error'); }
+      finally { this.confirmLoading = false; }
+    },
+
+    cancelConfirm() { this.confirmMode = false; },
+
+    async deleteTransaction(id) {
+      if (!confirm('确认删除这条记录？此操作不可恢复。')) return;
+      const res = await this.api(`/api/transactions/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        this.showToast('已删除', 'success');
+        const n = new Date();
+        await Promise.all([this.loadTransactions(), this.loadSummary(n.getFullYear(), n.getMonth()+1)]);
+      }
+    },
+
+    async runQuery() {
+      if (!this.queryInput.trim()) return;
+      this.queryLoading = true; this.queryResult = null;
+      try {
+        const res = await this.api('/api/ai/query', {
+          method: 'POST', body: JSON.stringify({ question: this.queryInput }),
+        });
+        if (!res.ok) { this.showToast((await res.json()).detail || '查询失败', 'error'); return; }
+        this.queryResult = await res.json();
+        this.showSQL = false;
+      } catch(e) { this.showToast('查询失败', 'error'); }
+      finally { this.queryLoading = false; }
+    },
+
+    openAddCategory() {
+      this.editingCat = null;
+      this.catForm = { name: '', description: '', color: '#3B82F6' };
+      this.showCatModal = true;
+    },
+    openEditCategory(cat) {
+      this.editingCat = cat;
+      this.catForm = { name: cat.name, description: cat.description || '', color: cat.color };
+      this.showCatModal = true;
+    },
+    async saveCategory() {
+      const url = this.editingCat ? `/api/categories/${this.editingCat.id}` : '/api/categories/';
+      const method = this.editingCat ? 'PUT' : 'POST';
+      const res = await this.api(url, { method, body: JSON.stringify(this.catForm) });
+      if (res.ok) {
+        this.showToast(this.editingCat ? '已更新' : '已创建', 'success');
+        this.showCatModal = false;
+        await this.loadCategories();
+      } else {
+        this.showToast((await res.json()).detail || '操作失败', 'error');
+      }
+    },
+    async deleteCategory(id) {
+      if (!confirm('确认删除该分类？')) return;
+      const res = await this.api(`/api/categories/${id}`, { method: 'DELETE' });
+      if (res.ok) { this.showToast('已删除', 'success'); await this.loadCategories(); }
+      else this.showToast((await res.json()).detail || '删除失败', 'error');
+    },
+
+    async generateReport() {
+      this.reportLoading = true;
+      try {
+        const res = await this.api('/api/reports/monthly', {
+          method: 'POST',
+          body: JSON.stringify({
+            year: parseInt(this.reportYear),
+            month: parseInt(this.reportMonth),
+            password: this.reportPassword || null,
+          }),
+        });
+        if (!res.ok) { this.showToast((await res.json()).detail || '生成失败', 'error'); return; }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `湛诺财务_${this.reportYear}年${this.reportMonth}月.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.showToast('报告已下载', 'success');
+      } catch(e) { this.showToast('生成失败: ' + e.message, 'error'); }
+      finally { this.reportLoading = false; }
+    },
+
+    async loadAISettings() {
+      if (!this.isAdmin) return;
+      try {
+        const res = await this.api('/api/settings/ai');
+        if (res.ok) {
+          const d = await res.json();
+          this.aiSettings = d;
+          this.aiProviderInput = d.provider || 'minimax';
+          this.aiGroupIdInput  = d.group_id  || '';
+        }
+      } catch {}
+    },
+
+    async saveAISettings() {
+      this.settingsLoading = true;
+      try {
+        const res = await this.api('/api/settings/ai', {
+          method: 'PUT',
+          body: JSON.stringify({
+            provider: this.aiProviderInput,
+            api_key:  this.aiKeyInput,
+            group_id: this.aiGroupIdInput,
+          }),
+        });
+        if (res.ok) {
+          this.aiKeyInput = '';
+          await this.loadAISettings();
+          this.showToast('设置已保存', 'success');
+        } else {
+          this.showToast('保存失败', 'error');
+        }
+      } catch { this.showToast('保存失败', 'error'); }
+      finally { this.settingsLoading = false; }
+    },
+
+    async testAIConnection() {
+      this.settingsLoading = true;
+      try {
+        const res = await this.api('/api/settings/ai/test', { method: 'POST' });
+        if (res.ok) {
+          this.showToast('AI 连接成功！', 'success');
+        } else {
+          const d = await res.json();
+          this.showToast('连接失败：' + (d.detail || '未知错误'), 'error');
+        }
+      } catch { this.showToast('连接测试失败', 'error'); }
+      finally { this.settingsLoading = false; }
+    },
+
+    // ── 用户管理 ──
+    async loadUsers() {
+      if (!this.isAdmin) return;
+      try {
+        const res = await this.api('/api/users/');
+        if (res.ok) this.userList = await res.json();
+      } catch {}
+    },
+
+    async createUser() {
+      if (!this.newUser.username.trim() || !this.newUser.password) {
+        this.showToast('请填写用户名和密码', 'error'); return;
+      }
+      const res = await this.api('/api/users/', {
+        method: 'POST',
+        body: JSON.stringify(this.newUser),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        this.showToast(`用户「${d.username}」已创建`, 'success');
+        this.showAddUser = false;
+        this.newUser = { username: '', password: '', role: 'readonly' };
+        await this.loadUsers();
+      } else {
+        this.showToast(d.detail || '创建失败', 'error');
+      }
+    },
+
+    async deleteUser(u) {
+      if (!confirm(`确定删除用户「${u.username}」？此操作不可恢复。`)) return;
+      const res = await this.api(`/api/users/${u.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        this.showToast(`用户「${u.username}」已删除`, 'success');
+        await this.loadUsers();
+      } else {
+        const d = await res.json();
+        this.showToast(d.detail || '删除失败', 'error');
+      }
+    },
+
+    async toggleUserRole(u) {
+      const newRole = u.role === 'admin' ? 'readonly' : 'admin';
+      const label = newRole === 'admin' ? '管理员' : '只读';
+      if (!confirm(`将「${u.username}」改为${label}？`)) return;
+      const res = await this.api(`/api/users/${u.id}/role`, {
+        method: 'PUT',
+        body: JSON.stringify({ role: newRole }),
+      });
+
+      if (res.ok) {
+        this.showToast('角色已更新', 'success');
+        await this.loadUsers();
+      } else {
+        const d = await res.json();
+        this.showToast(d.detail || '更新失败', 'error');
+      }
+    },
+
+    async promptResetPwd(u) {
+      const pwd = prompt(`重置「${u.username}」的密码\n请输入新密码（至少6位）：`);
+      if (!pwd) return;
+      if (pwd.length < 6) { this.showToast('密码至少6位', 'error'); return; }
+      const res = await this.api(`/api/users/${u.id}/password`, {
+        method: 'PUT',
+        body: JSON.stringify({ new_password: pwd }),
+      });
+      if (res.ok) {
+        this.showToast(`「${u.username}」密码已重置`, 'success');
+      } else {
+        const d = await res.json();
+        this.showToast(d.detail || '重置失败', 'error');
+      }
+    },
+
+    async changePassword() {
+      this.pwMsg = '';
+      const res = await this.api('/api/auth/change-password', {
+        method: 'POST', body: JSON.stringify({ old_password: this.pwOld, new_password: this.pwNew }),
+      });
+      const d = await res.json();
+      this.pwOk = res.ok;
+      this.pwMsg = d.message || d.detail || '';
+      if (res.ok) { this.pwOld = ''; this.pwNew = ''; }
+    },
+
+    showToast(msg, type = 'success') {
+      this.toast = { show: true, msg, type };
+      setTimeout(() => { this.toast.show = false; }, 3000);
+    },
+
+    // 工具函数
+    fmt(n) { return '¥' + parseFloat(n||0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+
+    catColor(name) {
+      const c = this.categories.find(c => c.name === name);
+      return c ? c.color : '#6B7280';
+    },
+
+    formatCell(v) {
+      if (v === null || v === undefined) return '—';
+      if (typeof v === 'number') return v % 1 === 0 ? v : v.toFixed(2);
+      return String(v);
+    },
+  };
+}
+</script>
+</body>
+</html>
