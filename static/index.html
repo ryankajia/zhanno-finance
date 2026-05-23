@@ -923,7 +923,7 @@ function app() {
       return Object.entries(this.summary.by_handler).slice(0, 2);
     },
     get filteredCategories() {
-      return this.categories.filter(c => c.category_type === this.txType);
+      return this.categories.filter(c => (c.category_type || 'expense') === this.txType);
     },
 
     // ── 方法 ──

@@ -61,17 +61,25 @@ def _migrate_db():
     from app.database import engine
     from sqlalchemy import text
 
-    migrations = [
+    add_cols = [
         "ALTER TABLE transactions ADD COLUMN transaction_type TEXT DEFAULT 'expense'",
         "ALTER TABLE categories ADD COLUMN category_type TEXT DEFAULT 'expense'",
     ]
+    # 填充旧行的 NULL 值（SQLite ALTER TABLE 不自动回填已有行）
+    fill_nulls = [
+        "UPDATE transactions SET transaction_type='expense' WHERE transaction_type IS NULL",
+        "UPDATE categories SET category_type='expense' WHERE category_type IS NULL",
+    ]
     with engine.connect() as conn:
-        for sql in migrations:
+        for sql in add_cols:
             try:
                 conn.execute(text(sql))
                 conn.commit()
             except Exception:
                 pass  # 字段已存在，跳过
+        for sql in fill_nulls:
+            conn.execute(text(sql))
+        conn.commit()
 
 
 def _seed_users(db, hash_fn):
