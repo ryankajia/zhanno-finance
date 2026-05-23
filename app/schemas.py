@@ -57,6 +57,7 @@ class AIQueryRequest(BaseModel):
 
 
 class ReportRequest(BaseModel):
-    year: int
-    month: int
+    date_from: date
+    date_to: date
+    transaction_type: str = "all"   # all | income | expense
     password: Optional[str] = None

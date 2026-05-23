@@ -512,16 +512,21 @@
             class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl px-4 py-2 transition-colors">+ 新增分类</button>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <template x-for="cat in categories" :key="cat.id">
-            <div class="card flex items-start gap-3">
+        <!-- 支出分类 -->
+        <div class="mb-2 flex items-center gap-2">
+          <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+          <span class="text-sm font-semibold text-slate-600">支出分类</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+          <template x-for="cat in categories.filter(c=>(c.category_type||'expense')==='expense')" :key="cat.id">
+            <div class="card flex items-start gap-3 border-l-4 border-blue-200">
               <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-white font-bold text-sm"
                 :style="'background:'+cat.color" x-text="cat.name.charAt(0)"></div>
               <div class="flex-1 min-w-0">
                 <div class="font-semibold text-sm" x-text="cat.name"></div>
                 <div class="text-xs text-slate-400 mt-0.5" x-text="cat.description||'—'"></div>
                 <div class="text-xs mt-1">
-                  <span x-show="cat.is_system" class="text-blue-500">系统内置</span>
+                  <span x-show="cat.is_system" class="text-blue-400">系统内置</span>
                   <span x-show="!cat.is_system" class="text-slate-400">自定义</span>
                 </div>
               </div>
@@ -532,23 +537,76 @@
             </div>
           </template>
         </div>
+
+        <!-- 收入分类 -->
+        <div class="mb-2 flex items-center gap-2">
+          <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
+          <span class="text-sm font-semibold text-slate-600">收入分类</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <template x-for="cat in categories.filter(c=>c.category_type==='income')" :key="cat.id">
+            <div class="card flex items-start gap-3 border-l-4 border-emerald-200">
+              <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-white font-bold text-sm"
+                :style="'background:'+cat.color" x-text="cat.name.charAt(0)"></div>
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold text-sm" x-text="cat.name"></div>
+                <div class="text-xs text-slate-400 mt-0.5" x-text="cat.description||'—'"></div>
+                <div class="text-xs mt-1">
+                  <span x-show="cat.is_system" class="text-emerald-500">系统内置</span>
+                  <span x-show="!cat.is_system" class="text-slate-400">自定义</span>
+                </div>
+              </div>
+              <div x-show="isAdmin" class="flex gap-1 shrink-0">
+                <button @click="openEditCategory(cat)" class="text-xs text-emerald-600 hover:text-emerald-800 px-2 py-1 rounded">编辑</button>
+                <button x-show="!cat.is_system" @click="deleteCategory(cat.id)" class="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded">删除</button>
+              </div>
+            </div>
+          </template>
+        </div>
       </div>
 
-      <!-- 月报导出 -->
+      <!-- 报表导出 -->
       <div x-show="currentPage==='reports'">
-        <h2 class="text-lg font-bold mb-4 text-slate-700">月报导出</h2>
+        <h2 class="text-lg font-bold mb-4 text-slate-700">报表导出</h2>
         <div class="max-w-md card">
           <div class="space-y-4">
+
+            <!-- 快捷选择 -->
+            <div>
+              <label class="block text-xs text-slate-500 mb-1.5">快速选择</label>
+              <div class="flex flex-wrap gap-2">
+                <button @click="setReportRange('thismonth')" class="text-xs px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600">本月</button>
+                <button @click="setReportRange('lastmonth')" class="text-xs px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600">上月</button>
+                <button @click="setReportRange('thisquarter')" class="text-xs px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600">本季度</button>
+                <button @click="setReportRange('thisyear')" class="text-xs px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600">今年</button>
+              </div>
+            </div>
+
+            <!-- 自定义日期区间 -->
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-xs text-slate-500 mb-1.5">年份</label>
-                <input type="number" x-model="reportYear" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <label class="block text-xs text-slate-500 mb-1.5">开始日期</label>
+                <input type="date" x-model="reportDateFrom" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
-                <label class="block text-xs text-slate-500 mb-1.5">月份</label>
-                <select x-model="reportMonth" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <template x-for="m in 12" :key="m"><option :value="m" x-text="m+'月'"></option></template>
-                </select>
+                <label class="block text-xs text-slate-500 mb-1.5">结束日期</label>
+                <input type="date" x-model="reportDateTo" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+            </div>
+
+            <!-- 导出类型 -->
+            <div>
+              <label class="block text-xs text-slate-500 mb-1.5">导出内容</label>
+              <div class="flex gap-1 bg-slate-100 rounded-xl p-1">
+                <button @click="reportTxType='all'"
+                  :class="reportTxType==='all' ? 'bg-white shadow text-slate-800 font-semibold' : 'text-slate-500'"
+                  class="flex-1 py-1.5 rounded-lg text-sm transition-all">全部（收支）</button>
+                <button @click="reportTxType='income'"
+                  :class="reportTxType==='income' ? 'bg-white shadow text-emerald-600 font-semibold' : 'text-slate-500'"
+                  class="flex-1 py-1.5 rounded-lg text-sm transition-all">仅收入</button>
+                <button @click="reportTxType='expense'"
+                  :class="reportTxType==='expense' ? 'bg-white shadow text-red-500 font-semibold' : 'text-slate-500'"
+                  class="flex-1 py-1.5 rounded-lg text-sm transition-all">仅支出</button>
               </div>
             </div>
 
@@ -560,7 +618,7 @@
               <div class="text-xs text-slate-400 mt-1">设置密码后，PDF 加密保护，适合发给只读合伙人</div>
             </div>
 
-            <button @click="generateReport()" :disabled="reportLoading"
+            <button @click="generateReport()" :disabled="reportLoading || !reportDateFrom || !reportDateTo"
               class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-xl py-2.5 text-sm transition-colors">
               <span x-show="!reportLoading">📄 生成并下载 PDF</span>
               <span x-show="reportLoading">生成中，请稍候...</span>
@@ -774,6 +832,17 @@
     <h3 class="font-bold text-slate-700 mb-4" x-text="editingCat?'编辑分类':'新增分类'"></h3>
     <div class="space-y-3">
       <div>
+        <label class="block text-xs text-slate-500 mb-1">类型<span class="text-red-400">*</span></label>
+        <div class="flex gap-1 bg-slate-100 rounded-xl p-1">
+          <button @click="catForm.category_type='expense'"
+            :class="catForm.category_type==='expense' ? 'bg-white shadow text-red-500 font-semibold' : 'text-slate-500'"
+            class="flex-1 py-1.5 rounded-lg text-sm transition-all">支出分类</button>
+          <button @click="catForm.category_type='income'"
+            :class="catForm.category_type==='income' ? 'bg-white shadow text-emerald-600 font-semibold' : 'text-slate-500'"
+            class="flex-1 py-1.5 rounded-lg text-sm transition-all">收入分类</button>
+        </div>
+      </div>
+      <div>
         <label class="block text-xs text-slate-500 mb-1">分类名称</label>
         <input type="text" x-model="catForm.name" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </div>
@@ -858,11 +927,12 @@ function app() {
     // 分类
     showCatModal: false,
     editingCat: null,
-    catForm: { name: '', description: '', color: '#3B82F6' },
+    catForm: { name: '', description: '', color: '#3B82F6', category_type: 'expense' },
 
     // 报告
-    reportYear: today.getFullYear(),
-    reportMonth: today.getMonth() + 1,
+    reportDateFrom: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0,10),
+    reportDateTo: today.toISOString().slice(0,10),
+    reportTxType: 'all',
     reportPassword: '',
     reportLoading: false,
 
@@ -1119,12 +1189,12 @@ function app() {
 
     openAddCategory() {
       this.editingCat = null;
-      this.catForm = { name: '', description: '', color: '#3B82F6' };
+      this.catForm = { name: '', description: '', color: '#3B82F6', category_type: 'expense' };
       this.showCatModal = true;
     },
     openEditCategory(cat) {
       this.editingCat = cat;
-      this.catForm = { name: cat.name, description: cat.description || '', color: cat.color };
+      this.catForm = { name: cat.name, description: cat.description || '', color: cat.color, category_type: cat.category_type || 'expense' };
       this.showCatModal = true;
     },
     async saveCategory() {
@@ -1146,14 +1216,35 @@ function app() {
       else this.showToast((await res.json()).detail || '删除失败', 'error');
     },
 
+    setReportRange(preset) {
+      const t = new Date();
+      const y = t.getFullYear(), m = t.getMonth();
+      const pad = d => d.toISOString().slice(0,10);
+      if (preset === 'thismonth') {
+        this.reportDateFrom = pad(new Date(y, m, 1));
+        this.reportDateTo   = pad(new Date(y, m+1, 0));
+      } else if (preset === 'lastmonth') {
+        this.reportDateFrom = pad(new Date(y, m-1, 1));
+        this.reportDateTo   = pad(new Date(y, m, 0));
+      } else if (preset === 'thisquarter') {
+        const q = Math.floor(m/3);
+        this.reportDateFrom = pad(new Date(y, q*3, 1));
+        this.reportDateTo   = pad(new Date(y, q*3+3, 0));
+      } else if (preset === 'thisyear') {
+        this.reportDateFrom = pad(new Date(y, 0, 1));
+        this.reportDateTo   = pad(new Date(y, 11, 31));
+      }
+    },
+
     async generateReport() {
       this.reportLoading = true;
       try {
         const res = await this.api('/api/reports/monthly', {
           method: 'POST',
           body: JSON.stringify({
-            year: parseInt(this.reportYear),
-            month: parseInt(this.reportMonth),
+            date_from: this.reportDateFrom,
+            date_to:   this.reportDateTo,
+            transaction_type: this.reportTxType,
             password: this.reportPassword || null,
           }),
         });

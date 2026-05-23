@@ -10,7 +10,6 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from pypdf import PdfWriter, PdfReader
 
-# macOS 上按优先级查找中文字体
 _FONT_CANDIDATES = [
     "/System/Library/Fonts/PingFang.ttc",
     "/System/Library/Fonts/Supplemental/PingFang.ttc",
@@ -18,9 +17,7 @@ _FONT_CANDIDATES = [
     "/System/Library/Fonts/STHeiti Light.ttc",
     "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
 ]
-
 _FONT_NAME = "Helvetica"
-
 for _path in _FONT_CANDIDATES:
     if os.path.exists(_path):
         try:
@@ -36,87 +33,125 @@ def _style(name: str, parent_name: str, **kwargs) -> ParagraphStyle:
     return ParagraphStyle(name, parent=base, fontName=_FONT_NAME, **kwargs)
 
 
-def generate_monthly_report(transactions: list, year: int, month: int) -> bytes:
+def _tbl(data, col_widths, header_color="#1E40AF"):
+    t = Table(data, colWidths=col_widths)
+    t.setStyle(TableStyle([
+        ("FONTNAME",      (0, 0), (-1, -1), _FONT_NAME),
+        ("FONTSIZE",      (0, 0), (-1, -1), 9),
+        ("BACKGROUND",    (0, 0), (-1, 0),  colors.HexColor(header_color)),
+        ("TEXTCOLOR",     (0, 0), (-1, 0),  colors.white),
+        ("FONTSIZE",      (0, 0), (-1, 0),  10),
+        ("ALIGN",         (1, 1), (-1, -1), "RIGHT"),
+        ("ROWBACKGROUNDS",(0, 1), (-1, -1), [colors.HexColor("#F8FAFC"), colors.white]),
+        ("GRID",          (0, 0), (-1, -1), 0.4, colors.HexColor("#CBD5E1")),
+        ("TOPPADDING",    (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 7),
+    ]))
+    return t
+
+
+def generate_report(transactions: list, date_from: date, date_to: date, tx_type: str = "all") -> bytes:
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=2 * cm, bottomMargin=2 * cm,
-                            leftMargin=2 * cm, rightMargin=2 * cm)
+    doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=2*cm, bottomMargin=2*cm,
+                            leftMargin=2*cm, rightMargin=2*cm)
 
-    title_s = _style("T", "Title", fontSize=18, spaceAfter=4, alignment=1)
-    sub_s = _style("S", "Normal", fontSize=12, spaceAfter=16, alignment=1, textColor=colors.HexColor("#475569"))
-    h2_s = _style("H2", "Heading2", fontSize=12, spaceBefore=14, spaceAfter=6)
-    body_s = _style("B", "Normal", fontSize=10)
+    title_s = _style("T",  "Title",   fontSize=18, spaceAfter=4, alignment=1)
+    sub_s   = _style("S",  "Normal",  fontSize=11, spaceAfter=4, alignment=1,
+                     textColor=colors.HexColor("#475569"))
+    h2_s    = _style("H2", "Heading2",fontSize=12, spaceBefore=14, spaceAfter=6)
+    body_s  = _style("B",  "Normal",  fontSize=10)
 
-    def tbl(data, col_widths, header_color="#1E40AF"):
-        t = Table(data, colWidths=col_widths)
-        t.setStyle(TableStyle([
-            ("FONTNAME", (0, 0), (-1, -1), _FONT_NAME),
-            ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(header_color)),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), _FONT_NAME),
-            ("FONTSIZE", (0, 0), (-1, 0), 10),
-            ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#F8FAFC"), colors.white]),
-            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#CBD5E1")),
-            ("TOPPADDING", (0, 0), (-1, -1), 5),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-            ("LEFTPADDING", (0, 0), (-1, -1), 7),
-        ]))
-        return t
+    type_label = {"all": "收支全览", "income": "收入报告", "expense": "支出报告"}.get(tx_type, "财务报告")
+    date_label = f"{date_from.strftime('%Y年%m月%d日')} — {date_to.strftime('%Y年%m月%d日')}"
 
     story = []
+    story.append(Paragraph("湛诺财务报告", title_s))
+    story.append(Paragraph(f"{type_label}　{date_label}", sub_s))
+    story.append(Spacer(1, 0.3*cm))
 
-    story.append(Paragraph("湛诺财务月度报告", title_s))
-    story.append(Paragraph(f"{year} 年 {month} 月", sub_s))
+    income_rows  = [t for t in transactions if t.get("transaction_type") == "income"]
+    expense_rows = [t for t in transactions if t.get("transaction_type") != "income"]
+    total_income  = sum(t["amount"] for t in income_rows)
+    total_expense = sum(t["amount"] for t in expense_rows)
+    net = total_income - total_expense
 
-    total = sum(t["amount"] for t in transactions)
-    story.append(Paragraph(f"本月支出合计：¥{total:,.2f}　　记录笔数：{len(transactions)} 笔", body_s))
-    story.append(Spacer(1, 0.3 * cm))
+    if tx_type == "all":
+        story.append(Paragraph(
+            f"收入合计：¥{total_income:,.2f}　　支出合计：¥{total_expense:,.2f}　　净结余：¥{net:+,.2f}　　共 {len(transactions)} 笔",
+            body_s))
+    elif tx_type == "income":
+        story.append(Paragraph(f"收入合计：¥{total_income:,.2f}　　共 {len(transactions)} 笔", body_s))
+    else:
+        story.append(Paragraph(f"支出合计：¥{total_expense:,.2f}　　共 {len(transactions)} 笔", body_s))
+    story.append(Spacer(1, 0.3*cm))
 
-    # 分类汇总
-    story.append(Paragraph("分类汇总", h2_s))
-    by_cat: dict[str, float] = {}
-    for t in transactions:
-        by_cat[t.get("category_name", "未分类")] = by_cat.get(t.get("category_name", "未分类"), 0) + t["amount"]
+    def cat_table(rows, header_color):
+        total = sum(r["amount"] for r in rows)
+        by_cat: dict[str, float] = {}
+        for r in rows:
+            k = r.get("category_name", "未分类")
+            by_cat[k] = by_cat.get(k, 0) + r["amount"]
+        data = [["分类", "金额（元）", "占比"]]
+        for name, amt in sorted(by_cat.items(), key=lambda x: -x[1]):
+            pct = amt / total * 100 if total else 0
+            data.append([name, f"¥{amt:,.2f}", f"{pct:.1f}%"])
+        data.append(["合　计", f"¥{total:,.2f}", "100%"])
+        return _tbl(data, [8*cm, 5*cm, 3*cm], header_color)
 
-    cat_data = [["分类", "金额（元）", "占比"]]
-    for name, amt in sorted(by_cat.items(), key=lambda x: -x[1]):
-        pct = amt / total * 100 if total else 0
-        cat_data.append([name, f"¥{amt:,.2f}", f"{pct:.1f}%"])
-    cat_data.append(["合　计", f"¥{total:,.2f}", "100%"])
-    story.append(tbl(cat_data, [8 * cm, 5 * cm, 3 * cm]))
+    def handler_table(rows, header_color):
+        by_h: dict[str, float] = {}
+        for r in rows:
+            h = r.get("handler", "未知")
+            by_h[h] = by_h.get(h, 0) + r["amount"]
+        data = [["经手人", "金额（元）"]]
+        for name, amt in sorted(by_h.items()):
+            data.append([name, f"¥{amt:,.2f}"])
+        return _tbl(data, [8*cm, 8*cm], header_color)
 
-    # 人员汇总
-    story.append(Paragraph("人员汇总", h2_s))
-    by_handler: dict[str, float] = {}
-    for t in transactions:
-        h = t.get("handler", "未知")
-        by_handler[h] = by_handler.get(h, 0) + t["amount"]
+    # 收入部分
+    if tx_type in ("all", "income") and income_rows:
+        story.append(Paragraph("收入 — 分类汇总", h2_s))
+        story.append(cat_table(income_rows, "#065F46"))
+        story.append(Spacer(1, 0.2*cm))
+        story.append(Paragraph("收入 — 人员汇总", h2_s))
+        story.append(handler_table(income_rows, "#065F46"))
 
-    h_data = [["经手人", "金额（元）"]]
-    for name, amt in sorted(by_handler.items()):
-        h_data.append([name, f"¥{amt:,.2f}"])
-    story.append(tbl(h_data, [8 * cm, 8 * cm]))
+    # 支出部分
+    if tx_type in ("all", "expense") and expense_rows:
+        story.append(Paragraph("支出 — 分类汇总", h2_s))
+        story.append(cat_table(expense_rows, "#1E40AF"))
+        story.append(Spacer(1, 0.2*cm))
+        story.append(Paragraph("支出 — 人员汇总", h2_s))
+        story.append(handler_table(expense_rows, "#1E40AF"))
 
     # 明细
     story.append(Paragraph("明细记录", h2_s))
-    d_data = [["日期", "分类", "经手人", "备注", "金额（元）"]]
-    for t in sorted(transactions, key=lambda x: x["transaction_date"]):
-        desc = (t.get("description") or "")[:18]
+    d_data = [["日期", "收/支", "分类", "经手人", "备注", "金额（元）"]]
+    for t in transactions:
+        ttype = "收入" if t.get("transaction_type") == "income" else "支出"
+        desc = (t.get("description") or "")[:16]
         d_data.append([
-            t["transaction_date"],
-            t.get("category_name", ""),
-            t.get("handler", ""),
-            desc,
-            f"¥{t['amount']:,.2f}",
+            t["transaction_date"], ttype,
+            t.get("category_name", ""), t.get("handler", ""),
+            desc, f"¥{t['amount']:,.2f}",
         ])
-    story.append(tbl(d_data, [2.5 * cm, 4 * cm, 2 * cm, 5 * cm, 2.5 * cm]))
+    story.append(_tbl(d_data, [2.3*cm, 1.5*cm, 3.5*cm, 2*cm, 4.5*cm, 2.2*cm]))
 
-    story.append(Spacer(1, 0.8 * cm))
-    story.append(Paragraph(f"报告生成时间：{date.today().strftime('%Y年%m月%d日')}　　仅供内部使用", body_s))
+    story.append(Spacer(1, 0.8*cm))
+    story.append(Paragraph(
+        f"报告生成时间：{date.today().strftime('%Y年%m月%d日')}　　仅供内部使用", body_s))
 
     doc.build(story)
     return buf.getvalue()
+
+
+# 保留旧名称兼容（旧代码调用 generate_monthly_report）
+def generate_monthly_report(transactions, year, month):
+    from datetime import date
+    import calendar
+    last_day = calendar.monthrange(year, month)[1]
+    return generate_report(transactions, date(year, month, 1), date(year, month, last_day))
 
 
 def protect_pdf(pdf_bytes: bytes, password: str) -> bytes:
