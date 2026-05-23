@@ -20,6 +20,11 @@ jobs:
       - name: 安装依赖
         run: pip install -r requirements.txt pyinstaller
 
+      - name: 注入 API Key
+        run: |
+          echo 'BUNDLED_MINIMAX_KEY = "${{ secrets.MINIMAX_API_KEY }}"' > app/utils/bundled_config.py
+          echo 'BUNDLED_MINIMAX_GROUP_ID = "${{ secrets.MINIMAX_GROUP_ID }}"' >> app/utils/bundled_config.py
+
       - name: 打包 .app
         run: pyinstaller zhanno.spec --noconfirm
 
@@ -54,6 +59,12 @@ jobs:
 
       - name: 安装依赖
         run: pip install -r requirements.txt pyinstaller
+
+      - name: 注入 API Key
+        run: |
+          echo 'BUNDLED_MINIMAX_KEY = "${{ secrets.MINIMAX_API_KEY }}"' > app/utils/bundled_config.py
+          echo 'BUNDLED_MINIMAX_GROUP_ID = "${{ secrets.MINIMAX_GROUP_ID }}"' >> app/utils/bundled_config.py
+        shell: bash
 
       - name: 打包 .exe
         run: pyinstaller zhanno.spec --noconfirm

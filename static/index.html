@@ -228,16 +228,16 @@
         <!-- AI 录入模式 -->
         <template x-if="entryMode==='ai'">
           <div>
-            <div x-show="!aiSettings.api_key_set"
+            <div x-show="!licenseStatus || !licenseStatus.valid"
               class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
               <svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
               </svg>
               <div class="flex-1 text-sm">
-                <span class="font-medium text-amber-800">AI 未配置</span>
-                <span class="text-amber-600 ml-1">— 请先在「系统设置」填写 API Key</span>
+                <span class="font-medium text-amber-800">AI 功能未激活</span>
+                <span class="text-amber-600 ml-1" x-text="'— ' + (licenseStatus ? licenseStatus.message : '加载中...')"></span>
               </div>
-              <button @click="navigate('settings')" class="text-xs text-amber-700 font-semibold bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors">去配置</button>
+              <button @click="navigate('settings')" class="text-xs text-amber-700 font-semibold bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors">去激活</button>
             </div>
 
             <div x-show="!confirmMode" class="card">
@@ -917,6 +917,7 @@ function app() {
         this.loadTransactions(),
         this.loadSummary(n.getFullYear(), n.getMonth() + 1),
         this.loadAISettings(),
+        this.loadLicense(),
       ]);
     },
 

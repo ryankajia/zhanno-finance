@@ -14,5 +14,6 @@ _db_path = _data_dir / "zhanno_finance.db"
 DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{_db_path}")
 ENCRYPTION_KEY: str | None = os.getenv("ENCRYPTION_KEY")
 
-MINIMAX_API_KEY: str | None = os.getenv("MINIMAX_API_KEY")
-MINIMAX_GROUP_ID: str | None = os.getenv("MINIMAX_GROUP_ID")
+from app.utils.bundled_config import BUNDLED_MINIMAX_KEY, BUNDLED_MINIMAX_GROUP_ID
+MINIMAX_API_KEY: str | None = os.getenv("MINIMAX_API_KEY") or BUNDLED_MINIMAX_KEY or None
+MINIMAX_GROUP_ID: str | None = os.getenv("MINIMAX_GROUP_ID") or BUNDLED_MINIMAX_GROUP_ID or None
