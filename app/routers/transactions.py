@@ -15,6 +15,7 @@ def _serialize(t: Transaction) -> dict:
     return {
         "id": t.id,
         "amount": t.amount,
+        "transaction_type": t.transaction_type or "expense",
         "category_id": t.category_id,
         "category_name": t.category.name if t.category else None,
         "handler": t.handler,
@@ -62,7 +63,8 @@ def get_summary(
         q = q.filter(extract("month", Transaction.transaction_date) == month)
 
     rows = q.all()
-    total = sum(t.amount for t in rows)
+    total_income = sum(t.amount for t in rows if (t.transaction_type or "expense") == "income")
+    total_expense = sum(t.amount for t in rows if (t.transaction_type or "expense") == "expense")
 
     by_category: dict[str, float] = {}
     by_handler: dict[str, float] = {}
@@ -70,13 +72,16 @@ def get_summary(
 
     for t in rows:
         name = t.category.name if t.category else "未分类"
+        signed = t.amount if (t.transaction_type or "expense") == "income" else -t.amount
         by_category[name] = by_category.get(name, 0) + t.amount
-        by_handler[t.handler] = by_handler.get(t.handler, 0) + t.amount
+        by_handler[t.handler] = by_handler.get(t.handler, 0) + signed
         if t.amount > max_amount:
             max_amount = t.amount
 
     return {
-        "total": total,
+        "total_income": total_income,
+        "total_expense": total_expense,
+        "net": total_income - total_expense,
         "count": len(rows),
         "max_amount": max_amount,
         "by_category": by_category,
@@ -97,6 +102,7 @@ def create_transaction(
 
     t = Transaction(
         amount=body.amount,
+        transaction_type=body.transaction_type,
         category_id=body.category_id,
         handler=body.handler,
         description=encrypt(body.description) if body.description else None,

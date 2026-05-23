@@ -23,6 +23,7 @@ class CategoryBase(BaseModel):
     name: str
     description: Optional[str] = None
     color: Optional[str] = "#3B82F6"
+    category_type: Optional[str] = "expense"
 
 
 class CategoryCreate(CategoryBase):
@@ -32,6 +33,7 @@ class CategoryCreate(CategoryBase):
 class CategoryOut(CategoryBase):
     id: int
     is_system: bool
+    category_type: str
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -39,6 +41,7 @@ class CategoryOut(CategoryBase):
 
 class TransactionCreate(BaseModel):
     amount: float
+    transaction_type: str = "expense"
     category_id: int
     handler: str
     description: Optional[str] = None

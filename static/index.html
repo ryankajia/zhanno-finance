@@ -146,26 +146,30 @@
         </h2>
 
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          <div class="card">
+          <div class="card border-l-4 border-emerald-400">
+            <div class="text-xs text-slate-400 mb-1">本月收入</div>
+            <div class="text-xl font-bold text-emerald-600" x-text="fmt(summary?.total_income||0)"></div>
+          </div>
+          <div class="card border-l-4 border-red-400">
             <div class="text-xs text-slate-400 mb-1">本月支出</div>
-            <div class="text-xl font-bold text-slate-800" x-text="fmt(summary?.total||0)"></div>
+            <div class="text-xl font-bold text-red-500" x-text="fmt(summary?.total_expense||0)"></div>
             <div class="text-xs text-slate-400 mt-1" x-text="(summary?.count||0)+'笔'"></div>
           </div>
-          <div class="card">
+          <div class="card border-l-4 border-blue-400">
+            <div class="text-xs text-slate-400 mb-1">净结余</div>
+            <div class="text-xl font-bold"
+              :class="(summary?.net||0)>=0 ? 'text-blue-600' : 'text-orange-500'"
+              x-text="fmt(summary?.net||0)"></div>
+          </div>
+          <div class="card border-l-4 border-amber-400">
             <div class="text-xs text-slate-400 mb-1">最大单笔</div>
             <div class="text-xl font-bold text-amber-600" x-text="fmt(summary?.max_amount||0)"></div>
           </div>
-          <template x-for="[h,amt] in topHandlers" :key="h">
-            <div class="card">
-              <div class="text-xs text-slate-400 mb-1" x-text="h+' 支出'"></div>
-              <div class="text-xl font-bold text-blue-600" x-text="fmt(amt)"></div>
-            </div>
-          </template>
         </div>
 
-        <!-- 分类支出条形图 -->
+        <!-- 分类分布 -->
         <div class="card mb-6" x-show="byCatList.length">
-          <div class="font-semibold text-sm text-slate-600 mb-3">分类支出分布</div>
+          <div class="font-semibold text-sm text-slate-600 mb-3">分类金额分布</div>
           <div class="space-y-2.5">
             <template x-for="item in byCatList" :key="item.name">
               <div>
@@ -174,8 +178,9 @@
                   <span x-text="fmt(item.amount)"></span>
                 </div>
                 <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div class="h-full bg-blue-500 rounded-full transition-all duration-500"
-                    :style="'width:'+((summary.total>0?item.amount/summary.total:0)*100).toFixed(1)+'%'"></div>
+                  <div class="h-full rounded-full transition-all duration-500"
+                    :class="item.type==='income' ? 'bg-emerald-400' : 'bg-blue-500'"
+                    :style="'width:'+((summary.total_expense+summary.total_income>0?item.amount/(summary.total_expense+summary.total_income):0)*100).toFixed(1)+'%'"></div>
                 </div>
               </div>
             </template>
@@ -200,8 +205,10 @@
                         :style="'background:'+catColor(t.category_name)+'20;color:'+catColor(t.category_name)"
                         x-text="t.category_name"></span>
                     </td>
-                    <td class="py-2 font-semibold text-slate-700" x-text="t.handler"></td>
-                    <td class="py-2 text-right font-semibold text-slate-800" x-text="fmt(t.amount)"></td>
+                    <td class="py-2 text-slate-700" x-text="t.handler"></td>
+                    <td class="py-2 text-right font-semibold"
+                      :class="t.transaction_type==='income' ? 'text-emerald-600' : 'text-slate-800'"
+                      x-text="(t.transaction_type==='income'?'+':'-') + fmt(t.amount)"></td>
                   </tr>
                 </template>
                 <tr x-show="!transactions.length"><td colspan="4" class="py-6 text-center text-slate-400 text-sm">本月暂无记录</td></tr>
@@ -215,14 +222,24 @@
       <div x-show="currentPage==='quickadd'" x-show="isAdmin">
         <h2 class="text-lg font-bold mb-4 text-slate-700">快速记账</h2>
 
-        <!-- 录入方式切换 -->
-        <div class="flex gap-1 bg-slate-100 rounded-xl p-1 mb-4 w-fit">
-          <button @click="entryMode='ai'; confirmMode=false"
-            :class="entryMode==='ai' ? 'bg-white shadow text-slate-800 font-semibold' : 'text-slate-500 hover:text-slate-700'"
-            class="px-4 py-1.5 rounded-lg text-sm transition-all">AI 智能录入</button>
-          <button @click="entryMode='manual'; confirmMode=false; initManualForm()"
-            :class="entryMode==='manual' ? 'bg-white shadow text-slate-800 font-semibold' : 'text-slate-500 hover:text-slate-700'"
-            class="px-4 py-1.5 rounded-lg text-sm transition-all">手动录入</button>
+        <!-- 收入/支出 + 录入方式 -->
+        <div class="flex flex-wrap gap-3 mb-4">
+          <div class="flex gap-1 bg-slate-100 rounded-xl p-1">
+            <button @click="txType='expense'"
+              :class="txType==='expense' ? 'bg-white shadow text-red-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
+              class="px-4 py-1.5 rounded-lg text-sm transition-all">支出</button>
+            <button @click="txType='income'"
+              :class="txType==='income' ? 'bg-white shadow text-emerald-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
+              class="px-4 py-1.5 rounded-lg text-sm transition-all">收入</button>
+          </div>
+          <div class="flex gap-1 bg-slate-100 rounded-xl p-1">
+            <button @click="entryMode='ai'; confirmMode=false"
+              :class="entryMode==='ai' ? 'bg-white shadow text-slate-800 font-semibold' : 'text-slate-500 hover:text-slate-700'"
+              class="px-4 py-1.5 rounded-lg text-sm transition-all">AI 智能录入</button>
+            <button @click="entryMode='manual'; confirmMode=false; initManualForm()"
+              :class="entryMode==='manual' ? 'bg-white shadow text-slate-800 font-semibold' : 'text-slate-500 hover:text-slate-700'"
+              class="px-4 py-1.5 rounded-lg text-sm transition-all">手动录入</button>
+          </div>
         </div>
 
         <!-- AI 录入模式 -->
@@ -270,14 +287,20 @@
                 <div>
                   <label class="block text-xs text-slate-500 mb-1">分类</label>
                   <select x-model="parsedCategoryId" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <template x-for="c in categories" :key="c.id">
+                    <template x-for="c in filteredCategories" :key="c.id">
                       <option :value="c.id" x-text="c.name"></option>
                     </template>
                   </select>
                 </div>
                 <div>
                   <label class="block text-xs text-slate-500 mb-1">经手人</label>
-                  <input type="text" x-model="parsedHandler" placeholder="输入姓名" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input type="text" x-model="parsedHandler" list="handler-list" placeholder="选择或输入姓名"
+                    class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <datalist id="handler-list">
+                    <template x-for="u in userList" :key="u.id">
+                      <option :value="u.username"></option>
+                    </template>
+                  </datalist>
                 </div>
                 <div>
                   <label class="block text-xs text-slate-500 mb-1">日期</label>
@@ -313,14 +336,14 @@
                 <label class="block text-xs text-slate-500 mb-1">分类<span class="text-red-400">*</span></label>
                 <select x-model="parsedCategoryId" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="">请选择分类</option>
-                  <template x-for="c in categories" :key="c.id">
+                  <template x-for="c in filteredCategories" :key="c.id">
                     <option :value="c.id" x-text="c.name"></option>
                   </template>
                 </select>
               </div>
               <div>
                 <label class="block text-xs text-slate-500 mb-1">经手人<span class="text-red-400">*</span></label>
-                <input type="text" x-model="parsedHandler" placeholder="输入姓名"
+                <input type="text" x-model="parsedHandler" list="handler-list" placeholder="选择或输入姓名"
                   class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
@@ -550,23 +573,24 @@
       <div x-show="currentPage==='settings'">
         <h2 class="text-lg font-bold mb-4 text-slate-700">系统设置</h2>
 
-        <!-- AI 接口配置 -->
-        <div class="max-w-lg card mb-4">
-          <div class="flex items-center gap-2 mb-4">
-            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-            <span class="font-semibold text-slate-700">AI 接口配置</span>
-          </div>
+        <!-- AI 接口配置（默认折叠，仅供管理员高级配置） -->
+        <div class="max-w-lg card mb-4" x-show="currentUser && currentUser.role==='admin'">
+          <button @click="showAIConfig=!showAIConfig" class="w-full flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span class="text-sm text-slate-500">高级配置：AI 接口设置</span>
+            </div>
+            <svg class="w-4 h-4 text-slate-400 transition-transform" :class="showAIConfig ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
 
-          <div class="mb-4 px-3 py-2.5 rounded-xl text-sm flex items-center gap-2"
-            :class="aiSettings.api_key_set ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'">
-            <span x-show="aiSettings.api_key_set">
-              ✓ AI 已配置
-              <span class="opacity-60 ml-1 text-xs" x-text="'(' + aiSettings.api_key_preview + ')'"></span>
-            </span>
-            <span x-show="!aiSettings.api_key_set">⚠ AI 未配置，请填写 API Key</span>
-          </div>
-
-          <div class="space-y-4">
+          <div x-show="showAIConfig" x-transition class="mt-4 space-y-4">
+            <div class="px-3 py-2.5 rounded-xl text-sm flex items-center gap-2"
+              :class="aiSettings.api_key_set ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'">
+              <span x-show="aiSettings.api_key_set">✓ AI 接口已配置
+                <span class="opacity-60 ml-1 text-xs" x-text="'(' + aiSettings.api_key_preview + ')'"></span>
+              </span>
+              <span x-show="!aiSettings.api_key_set">⚠ 未配置 API Key</span>
+            </div>
             <div>
               <label class="block text-xs text-slate-500 mb-1.5">AI 服务商</label>
               <select x-model="aiProviderInput" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -574,34 +598,29 @@
                 <option value="deepseek">DeepSeek（国内，价格极低）</option>
               </select>
             </div>
-
             <div>
               <label class="block text-xs text-slate-500 mb-1.5">API Key
                 <span class="text-slate-400 font-normal ml-1">（留空则不更新现有配置）</span>
               </label>
               <input type="text" x-model="aiKeyInput"
                 class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                placeholder="填写新 Key 才会更新，留空保持原配置" autocomplete="off" />
+                placeholder="填写新 Key 才会更新" autocomplete="off" />
             </div>
-
             <div x-show="aiProviderInput === 'minimax'">
-              <label class="block text-xs text-slate-500 mb-1.5">Group ID
-                <span class="text-slate-400 font-normal ml-1">（MiniMax 专用，可选）</span>
-              </label>
+              <label class="block text-xs text-slate-500 mb-1.5">Group ID（MiniMax 专用，可选）</label>
               <input type="text" x-model="aiGroupIdInput"
                 class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                 placeholder="可选" autocomplete="off" />
             </div>
-
-            <div class="flex gap-2 pt-1">
+            <div class="flex gap-2">
               <button @click="saveAISettings()" :disabled="settingsLoading"
                 class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold rounded-xl py-2.5 text-sm transition-colors">
-                <span x-show="!settingsLoading">保存设置</span>
+                <span x-show="!settingsLoading">保存</span>
                 <span x-show="settingsLoading">保存中...</span>
               </button>
               <button @click="testAIConnection()" :disabled="settingsLoading || !aiSettings.api_key_set"
                 class="px-5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
-                测试连接
+                测试
               </button>
             </div>
           </div>
@@ -813,6 +832,7 @@ function app() {
 
     // 快速记账
     entryMode: 'ai',
+    txType: 'expense',
     quickInput: '',
     confirmMode: false,
     quickLoading: false,
@@ -853,6 +873,7 @@ function app() {
     pwOk: false,
 
     // 系统设置
+    showAIConfig: false,
     aiSettings: { provider: 'minimax', api_key_set: false, api_key_preview: '', group_id: '' },
     aiKeyInput: '',
     aiGroupIdInput: '',
@@ -891,12 +912,18 @@ function app() {
     get byCatList() {
       if (!this.summary?.by_category) return [];
       return Object.entries(this.summary.by_category)
-        .map(([name, amount]) => ({ name, amount }))
+        .map(([name, amount]) => {
+          const cat = this.categories.find(c => c.name === name);
+          return { name, amount, type: cat?.category_type || 'expense' };
+        })
         .sort((a, b) => b.amount - a.amount);
     },
     get topHandlers() {
       if (!this.summary?.by_handler) return [];
       return Object.entries(this.summary.by_handler).slice(0, 2);
+    },
+    get filteredCategories() {
+      return this.categories.filter(c => c.category_type === this.txType);
     },
 
     // ── 方法 ──
@@ -918,6 +945,7 @@ function app() {
         this.loadSummary(n.getFullYear(), n.getMonth() + 1),
         this.loadAISettings(),
         this.loadLicense(),
+        this.loadUsers(),
       ]);
     },
 
@@ -1011,6 +1039,7 @@ function app() {
           method: 'POST',
           body: JSON.stringify({
             amount: parseFloat(this.parsedAmount),
+            transaction_type: this.txType,
             category_id: parseInt(this.parsedCategoryId),
             handler: this.parsedHandler,
             description: this.parsedDesc,
@@ -1031,7 +1060,8 @@ function app() {
     initManualForm() {
       const today = new Date().toISOString().slice(0, 10);
       this.parsedAmount = '';
-      this.parsedCategoryId = this.categories.length ? this.categories[0].id : null;
+      const first = this.filteredCategories[0];
+      this.parsedCategoryId = first ? first.id : null;
       this.parsedHandler = '';
       this.parsedDate = today;
       this.parsedDesc = '';
@@ -1047,6 +1077,7 @@ function app() {
           method: 'POST',
           body: JSON.stringify({
             amount: parseFloat(this.parsedAmount),
+            transaction_type: this.txType,
             category_id: parseInt(this.parsedCategoryId),
             handler: this.parsedHandler,
             description: this.parsedDesc,

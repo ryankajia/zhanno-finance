@@ -43,6 +43,8 @@ def init_data():
     from app.models import User, Category
     from app.auth import get_password_hash
 
+    _migrate_db()
+
     db = SessionLocal()
     try:
         _seed_users(db, get_password_hash)
@@ -52,6 +54,24 @@ def init_data():
         db.close()
 
     print("✅ 初始数据就绪")
+
+
+def _migrate_db():
+    """为旧数据库安全添加新字段（幂等）。"""
+    from app.database import engine
+    from sqlalchemy import text
+
+    migrations = [
+        "ALTER TABLE transactions ADD COLUMN transaction_type TEXT DEFAULT 'expense'",
+        "ALTER TABLE categories ADD COLUMN category_type TEXT DEFAULT 'expense'",
+    ]
+    with engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                pass  # 字段已存在，跳过
 
 
 def _seed_users(db, hash_fn):
@@ -64,13 +84,40 @@ def _seed_users(db, hash_fn):
 def _seed_categories(db):
     from app.models import Category
 
-    defaults = [
-        ("市场推广费", "#3B82F6", "市场推广相关支出"),
-        ("客户招待费", "#10B981", "客户接待餐饮差旅"),
-        ("内部垫资",   "#F59E0B", "合伙人代垫费用"),
-        ("商业咨询费", "#8B5CF6", "咨询顾问服务费"),
-        ("其他",       "#6B7280", "其他支出"),
+    # (名称, 颜色, 说明, 类型)
+    expense_defaults = [
+        ("员工薪资",   "#EC4899", "工资、奖金、社保等人力成本",   "expense"),
+        ("房租水电",   "#6366F1", "办公室租金、水电网络费用",     "expense"),
+        ("市场推广费", "#3B82F6", "广告、推广、品牌活动支出",     "expense"),
+        ("客户招待费", "#10B981", "客户接待餐饮、礼品、活动",     "expense"),
+        ("差旅费",     "#14B8A6", "出差交通、住宿、餐饮",         "expense"),
+        ("办公用品",   "#84CC16", "耗材、设备、办公家具",         "expense"),
+        ("软件服务费", "#F97316", "SaaS 订阅、云服务、工具软件",  "expense"),
+        ("内部垫资",   "#F59E0B", "合伙人代垫的公司费用",         "expense"),
+        ("商业咨询费", "#8B5CF6", "顾问、律师、审计等专业服务",   "expense"),
+        ("税费",       "#EF4444", "增值税、企业所得税、印花税等", "expense"),
+        ("其他支出",   "#6B7280", "以上分类未涵盖的其他支出",     "expense"),
     ]
-    for name, color, desc in defaults:
-        if not db.query(Category).filter(Category.name == name).first():
-            db.add(Category(name=name, color=color, description=desc, is_system=True))
+
+    income_defaults = [
+        ("项目收入",   "#10B981", "按项目交付结款的收入",         "income"),
+        ("服务收入",   "#3B82F6", "持续性服务、维保、订阅收入",   "income"),
+        ("产品销售",   "#8B5CF6", "实体或虚拟产品的销售收入",     "income"),
+        ("咨询收入",   "#F59E0B", "提供咨询、培训的收入",         "income"),
+        ("其他收入",   "#6B7280", "以上分类未涵盖的其他收入",     "income"),
+    ]
+
+    for name, color, desc, ctype in expense_defaults + income_defaults:
+        existing = db.query(Category).filter(Category.name == name).first()
+        if existing:
+            # 补全旧数据的 category_type
+            if existing.category_type != ctype:
+                existing.category_type = ctype
+        else:
+            db.add(Category(name=name, color=color, description=desc,
+                            category_type=ctype, is_system=True))
+
+    # 旧版"其他"兼容：改为支出类型
+    old_other = db.query(Category).filter(Category.name == "其他").first()
+    if old_other:
+        old_other.category_type = "expense"
