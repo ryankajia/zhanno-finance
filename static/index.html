@@ -518,7 +518,7 @@
           <span class="text-sm font-semibold text-slate-600">支出分类</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-          <template x-for="cat in categories.filter(c=>(c.category_type||'expense')==='expense')" :key="cat.id">
+          <template x-for="cat in expenseCategories" :key="cat.id">
             <div class="card flex items-start gap-3 border-l-4 border-blue-200">
               <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-white font-bold text-sm"
                 :style="'background:'+cat.color" x-text="cat.name.charAt(0)"></div>
@@ -544,7 +544,7 @@
           <span class="text-sm font-semibold text-slate-600">收入分类</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <template x-for="cat in categories.filter(c=>c.category_type==='income')" :key="cat.id">
+          <template x-for="cat in incomeCategories" :key="cat.id">
             <div class="card flex items-start gap-3 border-l-4 border-emerald-200">
               <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-white font-bold text-sm"
                 :style="'background:'+cat.color" x-text="cat.name.charAt(0)"></div>
@@ -900,7 +900,7 @@ function app() {
     filterMonth: today.getMonth() + 1,
 
     // 快速记账
-    entryMode: 'ai',
+    entryMode: 'manual',
     txType: 'expense',
     quickInput: '',
     confirmMode: false,
@@ -994,6 +994,12 @@ function app() {
     },
     get filteredCategories() {
       return this.categories.filter(c => (c.category_type || 'expense') === this.txType);
+    },
+    get expenseCategories() {
+      return this.categories.filter(c => (c.category_type || 'expense') === 'expense');
+    },
+    get incomeCategories() {
+      return this.categories.filter(c => c.category_type === 'income');
     },
 
     // ── 方法 ──
