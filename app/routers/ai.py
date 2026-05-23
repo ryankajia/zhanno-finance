@@ -29,8 +29,16 @@ def _fix_category_names(sql: str, real_names: list[str]) -> str:
 
 router = APIRouter()
 
-_HANDLERS = ["H", "S1", "W", "S2"]
 _DANGEROUS_SQL = ["DROP", "DELETE", "UPDATE", "INSERT", "CREATE", "ALTER", "TRUNCATE", "REPLACE"]
+
+
+def _check_ai_license():
+    from app.routers.settings import read_settings
+    from app.utils.license import validate_license
+    s = read_settings()
+    result = validate_license(s.get("license_key", ""))
+    if not result["valid"]:
+        raise HTTPException(status_code=403, detail=f"AI 功能未授权：{result['message']}")
 
 
 @router.post("/parse-transaction")
@@ -39,21 +47,24 @@ async def parse_transaction(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
+    _check_ai_license()
     today = date.today()
     yesterday = today - timedelta(days=1)
     categories = db.query(Category).all()
     cat_list = "、".join(c.name for c in categories)
+    handlers = [u.username for u in db.query(User).all()]
+    handler_list = "、".join(handlers) if handlers else "任意人名"
 
     system_prompt = f"""你是财务记账助手，从中文自然语言中提取记账信息。
 今天：{today.isoformat()}，昨天：{yesterday.isoformat()}
-可选经手人：{", ".join(_HANDLERS)}
+系统用户（经手人参考）：{handler_list}
 可选分类：{cat_list}
 
 严格返回 JSON（不含其他文字）：
 {{
   "amount": 数字,
   "category": "分类名",
-  "handler": "经手人或null",
+  "handler": "经手人姓名或null",
   "date": "YYYY-MM-DD",
   "description": "简短备注"
 }}
@@ -62,7 +73,7 @@ async def parse_transaction(
 - amount 必须是纯数字
 - date 必须 YYYY-MM-DD，"今天"={today.isoformat()}，"昨天"={yesterday.isoformat()}
 - category 从可选分类中匹配，匹配不到用"其他"
-- handler 匹配不到为 null"""
+- handler 从用户描述中提取姓名，无法判断时为 null"""
 
     try:
         response = await chat_completion(
@@ -98,9 +109,12 @@ async def ai_query(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
+    _check_ai_license()
     today = date.today()
     categories = db.query(Category).all()
     cat_list = "、".join(c.name for c in categories)
+    handlers = [u.username for u in db.query(User).all()]
+    handler_list = "、".join(handlers) if handlers else "任意人名"
 
     system_prompt = f"""你是财务数据库 SQL 助手。
 今天：{today.isoformat()}，年：{today.year}，月：{today.month}
@@ -111,7 +125,7 @@ async def ai_query(
 - users(id INTEGER, username TEXT)
 
 可用分类名（SQL 中必须使用完全一致的名称）：{cat_list}
-可用经手人：{", ".join(_HANDLERS)}
+系统用户（经手人参考）：{handler_list}
 
 规则：
 1. 只生成 SELECT 语句

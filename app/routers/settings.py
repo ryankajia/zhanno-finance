@@ -78,3 +78,40 @@ async def test_ai_connection(_: User = Depends(require_admin)):
         return {"ok": True, "response": result}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ── AI 授权码 ────────────────────────────────────────────────
+
+class LicenseBody(BaseModel):
+    key: str
+
+
+@router.get("/license")
+def get_license_status(_: User = Depends(require_admin)):
+    from app.utils.license import validate_license
+    s = read_settings()
+    key = s.get("license_key", "")
+    result = validate_license(key)
+    preview = (key[:6] + "****") if key else ""
+    return {"key_preview": preview, **result}
+
+
+@router.post("/license")
+def set_license_key(body: LicenseBody, _: User = Depends(require_admin)):
+    from app.utils.license import validate_license
+    key = body.key.strip().upper()
+    result = validate_license(key)
+    if not result["valid"]:
+        raise HTTPException(status_code=400, detail=result["message"])
+    s = read_settings()
+    s["license_key"] = key
+    write_settings(s)
+    return {"ok": True, **result}
+
+
+@router.delete("/license")
+def clear_license_key(_: User = Depends(require_admin)):
+    s = read_settings()
+    s.pop("license_key", None)
+    write_settings(s)
+    return {"ok": True}

@@ -51,6 +51,11 @@
         <span x-show="!loginLoading">登 录</span>
         <span x-show="loginLoading">登录中...</span>
       </button>
+
+      <div class="mt-4 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-xs text-slate-500 text-center">
+        首次登录默认账号：<span class="font-mono font-semibold text-slate-700">admin</span> &nbsp;/&nbsp; <span class="font-mono font-semibold text-slate-700">123456</span><br/>
+        <span class="text-slate-400">登录后请在「系统设置 → 用户管理」修改密码</span>
+      </div>
     </div>
   </div>
 </div>
@@ -210,81 +215,134 @@
       <div x-show="currentPage==='quickadd'" x-show="isAdmin">
         <h2 class="text-lg font-bold mb-4 text-slate-700">快速记账</h2>
 
-        <div x-show="!aiSettings.api_key_set"
-          class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
-          <svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-          </svg>
-          <div class="flex-1 text-sm">
-            <span class="font-medium text-amber-800">AI 未配置</span>
-            <span class="text-amber-600 ml-1">— 请先在「系统设置」填写 API Key</span>
-          </div>
-          <button @click="navigate('settings')" class="text-xs text-amber-700 font-semibold bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors">去配置</button>
+        <!-- 录入方式切换 -->
+        <div class="flex gap-1 bg-slate-100 rounded-xl p-1 mb-4 w-fit">
+          <button @click="entryMode='ai'; confirmMode=false"
+            :class="entryMode==='ai' ? 'bg-white shadow text-slate-800 font-semibold' : 'text-slate-500 hover:text-slate-700'"
+            class="px-4 py-1.5 rounded-lg text-sm transition-all">AI 智能录入</button>
+          <button @click="entryMode='manual'; confirmMode=false; initManualForm()"
+            :class="entryMode==='manual' ? 'bg-white shadow text-slate-800 font-semibold' : 'text-slate-500 hover:text-slate-700'"
+            class="px-4 py-1.5 rounded-lg text-sm transition-all">手动录入</button>
         </div>
 
-        <div x-show="!confirmMode" class="card">
-          <div class="text-sm text-slate-500 mb-3">用一句话描述这笔支出，AI 自动提取信息</div>
-          <textarea x-model="quickInput" rows="3"
-            class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            placeholder="例如：今天 H 请客户吃饭花了 1500&#10;S1 上午交了 3000 商业咨询费"></textarea>
+        <!-- AI 录入模式 -->
+        <template x-if="entryMode==='ai'">
+          <div>
+            <div x-show="!aiSettings.api_key_set"
+              class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
+              <svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+              </svg>
+              <div class="flex-1 text-sm">
+                <span class="font-medium text-amber-800">AI 未配置</span>
+                <span class="text-amber-600 ml-1">— 请先在「系统设置」填写 API Key</span>
+              </div>
+              <button @click="navigate('settings')" class="text-xs text-amber-700 font-semibold bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors">去配置</button>
+            </div>
 
-          <div class="mt-3 flex gap-2">
-            <button @click="parseInput()" :disabled="quickLoading || !quickInput.trim()"
-              class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold rounded-xl py-2.5 text-sm transition-colors">
-              <span x-show="!quickLoading">✨ AI 智能解析</span>
-              <span x-show="quickLoading">解析中...</span>
-            </button>
-          </div>
-        </div>
+            <div x-show="!confirmMode" class="card">
+              <div class="text-sm text-slate-500 mb-3">用一句话描述这笔支出，AI 自动提取信息</div>
+              <textarea x-model="quickInput" rows="3"
+                class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                placeholder="例如：今天张三请客户吃饭花了 1500元&#10;李四上午交了 3000 商业咨询费"></textarea>
+              <div class="mt-3 flex gap-2">
+                <button @click="parseInput()" :disabled="quickLoading || !quickInput.trim()"
+                  class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold rounded-xl py-2.5 text-sm transition-colors">
+                  <span x-show="!quickLoading">✨ AI 智能解析</span>
+                  <span x-show="quickLoading">解析中...</span>
+                </button>
+              </div>
+            </div>
 
-        <!-- 确认卡片 -->
-        <div x-show="confirmMode" class="card border-2 border-blue-200">
-          <div class="flex items-center gap-2 mb-4">
-            <div class="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center">
-              <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+            <!-- AI确认卡片 -->
+            <div x-show="confirmMode" class="card border-2 border-blue-200">
+              <div class="flex items-center gap-2 mb-4">
+                <div class="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center">
+                  <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                </div>
+                <span class="text-sm font-semibold text-blue-700">AI 解析完成，请确认信息</span>
+              </div>
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">金额（元）</label>
+                  <input type="number" x-model="parsedAmount" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">分类</label>
+                  <select x-model="parsedCategoryId" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <template x-for="c in categories" :key="c.id">
+                      <option :value="c.id" x-text="c.name"></option>
+                    </template>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">经手人</label>
+                  <input type="text" x-model="parsedHandler" placeholder="输入姓名" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">日期</label>
+                  <input type="date" x-model="parsedDate" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div class="sm:col-span-2">
+                  <label class="block text-xs text-slate-500 mb-1">备注</label>
+                  <input type="text" x-model="parsedDesc" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div class="flex gap-2 mt-4">
+                <button @click="confirmTransaction()" :disabled="confirmLoading"
+                  class="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold rounded-xl py-2.5 text-sm">
+                  <span x-show="!confirmLoading">✓ 确认入账</span>
+                  <span x-show="confirmLoading">提交中...</span>
+                </button>
+                <button @click="cancelConfirm()" class="px-5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">重新输入</button>
+              </div>
             </div>
-            <span class="text-sm font-semibold text-blue-700">AI 解析完成，请确认信息</span>
           </div>
+        </template>
 
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label class="block text-xs text-slate-500 mb-1">金额（元）</label>
-              <input type="number" x-model="parsedAmount" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <!-- 手动录入模式 -->
+        <template x-if="entryMode==='manual'">
+          <div class="card">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label class="block text-xs text-slate-500 mb-1">金额（元）<span class="text-red-400">*</span></label>
+                <input type="number" x-model="parsedAmount" min="0" step="0.01" placeholder="0.00"
+                  class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label class="block text-xs text-slate-500 mb-1">分类<span class="text-red-400">*</span></label>
+                <select x-model="parsedCategoryId" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">请选择分类</option>
+                  <template x-for="c in categories" :key="c.id">
+                    <option :value="c.id" x-text="c.name"></option>
+                  </template>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-slate-500 mb-1">经手人<span class="text-red-400">*</span></label>
+                <input type="text" x-model="parsedHandler" placeholder="输入姓名"
+                  class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label class="block text-xs text-slate-500 mb-1">日期<span class="text-red-400">*</span></label>
+                <input type="date" x-model="parsedDate"
+                  class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-xs text-slate-500 mb-1">备注说明</label>
+                <input type="text" x-model="parsedDesc" placeholder="可选，简要描述这笔支出"
+                  class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
             </div>
-            <div>
-              <label class="block text-xs text-slate-500 mb-1">分类</label>
-              <select x-model="parsedCategoryId" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <template x-for="c in categories" :key="c.id">
-                  <option :value="c.id" x-text="c.name"></option>
-                </template>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs text-slate-500 mb-1">经手人</label>
-              <select x-model="parsedHandler" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="H">H</option><option value="S1">S1</option>
-                <option value="W">W</option><option value="S2">S2</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs text-slate-500 mb-1">日期</label>
-              <input type="date" x-model="parsedDate" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div class="sm:col-span-2">
-              <label class="block text-xs text-slate-500 mb-1">备注</label>
-              <input type="text" x-model="parsedDesc" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <div class="mt-4">
+              <button @click="manualSubmit()" :disabled="confirmLoading || !parsedAmount || !parsedCategoryId || !parsedHandler || !parsedDate"
+                class="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white font-semibold rounded-xl py-2.5 text-sm transition-colors">
+                <span x-show="!confirmLoading">✓ 确认入账</span>
+                <span x-show="confirmLoading">提交中...</span>
+              </button>
             </div>
           </div>
-
-          <div class="flex gap-2 mt-4">
-            <button @click="confirmTransaction()" :disabled="confirmLoading"
-              class="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold rounded-xl py-2.5 text-sm">
-              <span x-show="!confirmLoading">✓ 确认入账</span>
-              <span x-show="confirmLoading">提交中...</span>
-            </button>
-            <button @click="cancelConfirm()" class="px-5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">重新输入</button>
-          </div>
-        </div>
+        </template>
       </div>
 
       <!-- 账目明细 -->
@@ -549,6 +607,40 @@
           </div>
         </div>
 
+        <!-- AI 授权码 -->
+        <div class="max-w-lg card mb-4" x-show="currentUser && currentUser.role==='admin'">
+          <div class="flex items-center gap-2 mb-4">
+            <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+            <span class="font-semibold text-slate-700">AI 功能授权</span>
+          </div>
+
+          <!-- 状态显示 -->
+          <div class="mb-4 px-3 py-2.5 rounded-xl text-sm flex items-center gap-2"
+            :class="licenseStatus && licenseStatus.valid ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'">
+            <span x-show="licenseStatus && licenseStatus.valid">
+              ✓ <span x-text="licenseStatus && licenseStatus.message"></span>
+              <span class="opacity-60 ml-1 text-xs" x-text="licenseStatus && licenseStatus.key_preview ? '(' + licenseStatus.key_preview + ')' : ''"></span>
+            </span>
+            <span x-show="!licenseStatus || !licenseStatus.valid">
+              ✗ <span x-text="licenseStatus ? licenseStatus.message : '加载中...'"></span>
+            </span>
+          </div>
+
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1.5">粘贴授权码</label>
+              <input type="text" x-model="licenseKeyInput"
+                class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono uppercase"
+                placeholder="ZN-YYYYMM-XXXXXXXX" autocomplete="off" />
+              <div class="text-xs text-slate-400 mt-1">每月付费后收到新授权码，粘贴此处即可开启 AI 功能</div>
+            </div>
+            <button @click="saveLicense()" :disabled="settingsLoading || !licenseKeyInput.trim()"
+              class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-semibold rounded-xl py-2.5 text-sm transition-colors">
+              激活授权码
+            </button>
+          </div>
+        </div>
+
         <!-- 用户管理（仅管理员） -->
         <div class="max-w-lg card mb-4" x-show="currentUser && currentUser.role==='admin'">
           <div class="flex items-center justify-between mb-4">
@@ -720,13 +812,14 @@ function app() {
     filterMonth: today.getMonth() + 1,
 
     // 快速记账
+    entryMode: 'ai',
     quickInput: '',
     confirmMode: false,
     quickLoading: false,
     confirmLoading: false,
     parsedAmount: 0,
     parsedCategoryId: null,
-    parsedHandler: 'H',
+    parsedHandler: '',
     parsedDate: '',
     parsedDesc: '',
 
@@ -765,6 +858,10 @@ function app() {
     aiGroupIdInput: '',
     aiProviderInput: 'minimax',
     settingsLoading: false,
+
+    // AI 授权码
+    licenseStatus: null,
+    licenseKeyInput: '',
 
     // 用户管理
     userList: [],
@@ -884,7 +981,7 @@ function app() {
       this.currentPage = page;
       this.mobileMenuOpen = false;
       if (page === 'transactions') this.loadTransactions();
-      if (page === 'settings') { this.loadAISettings(); this.loadUsers(); }
+      if (page === 'settings') { this.loadAISettings(); this.loadLicense(); this.loadUsers(); }
     },
 
     async parseInput() {
@@ -929,6 +1026,40 @@ function app() {
     },
 
     cancelConfirm() { this.confirmMode = false; },
+
+    initManualForm() {
+      const today = new Date().toISOString().slice(0, 10);
+      this.parsedAmount = '';
+      this.parsedCategoryId = this.categories.length ? this.categories[0].id : null;
+      this.parsedHandler = '';
+      this.parsedDate = today;
+      this.parsedDesc = '';
+    },
+
+    async manualSubmit() {
+      if (!this.parsedAmount || !this.parsedCategoryId || !this.parsedHandler || !this.parsedDate) {
+        this.showToast('请填写所有必填项', 'error'); return;
+      }
+      this.confirmLoading = true;
+      try {
+        const res = await this.api('/api/transactions/', {
+          method: 'POST',
+          body: JSON.stringify({
+            amount: parseFloat(this.parsedAmount),
+            category_id: parseInt(this.parsedCategoryId),
+            handler: this.parsedHandler,
+            description: this.parsedDesc,
+            transaction_date: this.parsedDate,
+          }),
+        });
+        if (!res.ok) { this.showToast((await res.json()).detail || '入账失败', 'error'); return; }
+        this.showToast('入账成功！', 'success');
+        this.initManualForm();
+        const n = new Date();
+        await Promise.all([this.loadTransactions(), this.loadSummary(n.getFullYear(), n.getMonth()+1)]);
+      } catch { this.showToast('入账失败', 'error'); }
+      finally { this.confirmLoading = false; }
+    },
 
     async deleteTransaction(id) {
       if (!confirm('确认删除这条记录？此操作不可恢复。')) return;
@@ -1053,6 +1184,34 @@ function app() {
           this.showToast('连接失败：' + (d.detail || '未知错误'), 'error');
         }
       } catch { this.showToast('连接测试失败', 'error'); }
+      finally { this.settingsLoading = false; }
+    },
+
+    // ── AI 授权码 ──
+    async loadLicense() {
+      try {
+        const res = await this.api('/api/settings/license');
+        if (res.ok) this.licenseStatus = await res.json();
+      } catch {}
+    },
+
+    async saveLicense() {
+      if (!this.licenseKeyInput.trim()) return;
+      this.settingsLoading = true;
+      try {
+        const res = await this.api('/api/settings/license', {
+          method: 'POST',
+          body: JSON.stringify({ key: this.licenseKeyInput.trim() }),
+        });
+        const d = await res.json();
+        if (res.ok) {
+          this.showToast('授权码激活成功！', 'success');
+          this.licenseKeyInput = '';
+          await this.loadLicense();
+        } else {
+          this.showToast(d.detail || '授权码无效', 'error');
+        }
+      } catch { this.showToast('激活失败', 'error'); }
       finally { this.settingsLoading = false; }
     },
 
