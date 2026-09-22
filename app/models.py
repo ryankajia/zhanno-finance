@@ -63,3 +63,29 @@ class AuditLog(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="audit_logs")
+
+
+class TaxProfile(Base):
+    """纳税人档案（单行配置，决定提醒哪些税种）。"""
+    __tablename__ = "tax_profile"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filing_period = Column(String(10), default="quarter")   # month | quarter
+    has_employees = Column(Boolean, default=True)           # 是否需代扣代缴个税
+    has_business_income = Column(Boolean, default=False)    # 是否有经营所得
+    enabled_taxes = Column(Text, nullable=True)             # JSON 列表，空=全部
+    remind_days = Column(Integer, default=7)                # 提前几天提醒
+    region = Column(String(50), nullable=True)              # 备注所在省市
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class TaxFilingLog(Base):
+    """某税种某所属期的申报完成记录。"""
+    __tablename__ = "tax_filing_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tax_code = Column(String(50), nullable=False, index=True)
+    period_key = Column(String(20), nullable=False, index=True)
+    filed_at = Column(DateTime, default=datetime.utcnow)
+    filed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    note = Column(Text, nullable=True)

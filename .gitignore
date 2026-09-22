@@ -13,3 +13,7 @@ dist/
 *.spec.bak
 .DS_Store
 .claude/
+
+# 交付物（打包产物，不入库）
+交付物/*.dmg
+交付物/*.zip

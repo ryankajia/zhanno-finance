@@ -32,6 +32,7 @@ jobs:
         run: |
           mkdir /tmp/zhanno_dmg
           cp -r "dist/湛诺财务系统.app" /tmp/zhanno_dmg/
+          cp "交付物/使用说明.html" /tmp/zhanno_dmg/ || true
           ln -sf /Applications /tmp/zhanno_dmg/Applications
           hdiutil create \
             -volname "湛诺财务系统 v1.0" \
@@ -71,6 +72,7 @@ jobs:
 
       - name: 制作安装包 (zip)
         run: |
+          Copy-Item "交付物\使用说明.html" -Destination "dist\湛诺财务系统\" -ErrorAction SilentlyContinue
           cd dist
           Compress-Archive -Path "湛诺财务系统" -DestinationPath "湛诺财务系统_v1.0_Windows.zip"
         shell: pwsh

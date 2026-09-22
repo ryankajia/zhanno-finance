@@ -33,7 +33,6 @@ class CategoryCreate(CategoryBase):
 class CategoryOut(CategoryBase):
     id: int
     is_system: bool
-    category_type: str
     created_at: datetime
 
     model_config = {"from_attributes": True}

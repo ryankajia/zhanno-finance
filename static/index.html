@@ -145,6 +145,34 @@
           <span class="text-sm font-normal text-slate-400 ml-2" x-text="currentYearMonth"></span>
         </h2>
 
+        <!-- 税务提醒横幅 -->
+        <div x-show="taxAlerts.length" x-transition class="mb-5">
+          <template x-for="a in taxAlerts.slice(0,3)" :key="a.code+a.period_key">
+            <div class="flex items-center gap-3 rounded-xl px-4 py-3 mb-2 border"
+              :class="a.status==='overdue' ? 'bg-red-50 border-red-200'
+                    : a.status==='urgent'  ? 'bg-orange-50 border-orange-200'
+                                           : 'bg-amber-50 border-amber-200'">
+              <span class="text-lg" x-text="a.status==='overdue' ? '🚨' : '⏰'"></span>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold"
+                  :class="a.status==='overdue' ? 'text-red-700' : 'text-amber-800'">
+                  <span x-text="a.name"></span>
+                  <span class="font-normal text-xs opacity-70" x-text="'（'+a.period_label+'）'"></span>
+                </div>
+                <div class="text-xs mt-0.5" :class="a.status==='overdue' ? 'text-red-600' : 'text-amber-700'"
+                  x-text="a.days_left < 0
+                    ? '已逾期 '+Math.abs(a.days_left)+' 天，申报截止 '+a.due_date
+                    : (a.days_left===0 ? '今天就是截止日 '+a.due_date : '还剩 '+a.days_left+' 天，'+a.due_date+' 截止')"></div>
+              </div>
+              <button @click="currentPage='tax'" class="text-xs px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 whitespace-nowrap">查看</button>
+            </div>
+          </template>
+          <div x-show="taxAlerts.length>3" class="text-xs text-slate-400 pl-1">
+            还有 <span x-text="taxAlerts.length-3"></span> 项待办，
+            <button @click="currentPage='tax'" class="text-blue-500 hover:underline">全部查看</button>
+          </div>
+        </div>
+
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           <div class="card border-l-4 border-emerald-400">
             <div class="text-xs text-slate-400 mb-1">本月收入</div>
@@ -219,7 +247,7 @@
       </div>
 
       <!-- 快速记账 -->
-      <div x-show="currentPage==='quickadd'" x-show="isAdmin">
+      <div x-show="currentPage==='quickadd' && isAdmin">
         <h2 class="text-lg font-bold mb-4 text-slate-700">快速记账</h2>
 
         <!-- 收入/支出切换 -->
@@ -319,7 +347,9 @@
           <div class="flex flex-wrap gap-2">
             <select x-model="filterHandler" @change="loadTransactions()" class="border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">全部经手人</option>
-              <option>H</option><option>S1</option><option>W</option><option>S2</option>
+              <template x-for="h in handlerOptions" :key="h">
+                <option :value="h" x-text="h"></option>
+              </template>
             </select>
             <select x-model="filterCategoryId" @change="loadTransactions()" class="border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">全部分类</option>
@@ -337,10 +367,26 @@
         </div>
 
         <div class="card">
-          <div class="text-xs text-slate-400 mb-3" x-text="transactions.length + ' 条记录'"></div>
+          <div class="flex items-center gap-3 mb-3 flex-wrap">
+            <div class="text-xs text-slate-400" x-text="transactions.length + ' 条记录'"></div>
+            <div x-show="isAdmin && selectedIds.length" x-transition
+              class="flex items-center gap-2 ml-auto bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
+              <span class="text-xs text-red-700 font-medium">已选 <span x-text="selectedIds.length"></span> 条</span>
+              <button @click="batchDelete()" :disabled="batchDeleting"
+                class="text-xs px-3 py-1 rounded-md bg-red-500 text-white hover:bg-red-600 disabled:opacity-50">
+                <span x-show="!batchDeleting">批量删除</span><span x-show="batchDeleting">删除中...</span>
+              </button>
+              <button @click="selectedIds=[]" class="text-xs text-slate-500 hover:text-slate-700 px-2">取消</button>
+            </div>
+          </div>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead><tr class="text-xs text-slate-400 border-b border-slate-100">
+                <th x-show="isAdmin" class="text-left pb-3 w-8">
+                  <input type="checkbox" class="rounded border-slate-300"
+                    :checked="transactions.length && selectedIds.length===transactions.length"
+                    @change="toggleSelectAll($event.target.checked)" />
+                </th>
                 <th class="text-left pb-3">日期</th>
                 <th class="text-left pb-3">分类</th>
                 <th class="text-left pb-3">经手人</th>
@@ -350,7 +396,13 @@
               </tr></thead>
               <tbody>
                 <template x-for="t in transactions" :key="t.id">
-                  <tr class="border-b border-slate-50 hover:bg-slate-50 group">
+                  <tr class="border-b border-slate-50 hover:bg-slate-50 group"
+                      :class="selectedIds.includes(t.id) ? 'bg-blue-50/60' : ''">
+                    <td x-show="isAdmin" class="py-2.5">
+                      <input type="checkbox" class="rounded border-slate-300"
+                        :value="t.id" :checked="selectedIds.includes(t.id)"
+                        @change="toggleSelect(t.id)" />
+                    </td>
                     <td class="py-2.5 text-slate-500 text-xs whitespace-nowrap" x-text="t.transaction_date"></td>
                     <td class="py-2.5">
                       <span class="px-2 py-0.5 rounded-full text-xs font-medium"
@@ -366,7 +418,7 @@
                   </tr>
                 </template>
                 <tr x-show="!transactions.length">
-                  <td colspan="6" class="py-10 text-center text-slate-400">暂无记录</td>
+                  <td :colspan="isAdmin ? 7 : 6" class="py-10 text-center text-slate-400">暂无记录</td>
                 </tr>
               </tbody>
             </table>
@@ -395,7 +447,7 @@
           <div class="flex gap-2">
             <input type="text" x-model="queryInput" @keydown.enter="runQuery()"
               class="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="例如：S1 上个月花了多少？本月各分类支出？H 本年度垫资了多少？" />
+              placeholder="例如：上个月一共花了多少？本月各分类支出？张三今年报销了多少？" />
             <button @click="runQuery()" :disabled="queryLoading || !queryInput.trim()"
               class="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold rounded-xl px-5 text-sm transition-colors whitespace-nowrap">
               <span x-show="!queryLoading">查询</span>
@@ -449,6 +501,134 @@
       </div>
 
       <!-- 分类管理 -->
+      <!-- ══════════ 税务提醒 ══════════ -->
+      <div x-show="currentPage==='tax'">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+          <h2 class="text-lg font-bold text-slate-700 flex-1">税务提醒</h2>
+          <button x-show="isAdmin" @click="showTaxProfile=!showTaxProfile"
+            class="text-sm px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50">⚙ 纳税人设置</button>
+        </div>
+
+        <!-- 纳税人档案 -->
+        <div x-show="showTaxProfile" x-transition class="card mb-4 max-w-2xl">
+          <div class="font-semibold text-sm text-slate-600 mb-3">纳税人档案</div>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">增值税申报周期</label>
+              <select x-model="taxProfile.filing_period" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                <option value="quarter">按季申报（小规模纳税人常见）</option>
+                <option value="month">按月申报（一般纳税人常见）</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">提前几天开始提醒</label>
+              <input type="number" min="0" max="60" x-model.number="taxProfile.remind_days"
+                class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">所在省市（备注用）</label>
+              <input type="text" x-model="taxProfile.region" placeholder="如：广东省深圳市"
+                class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div class="space-y-2 pt-5">
+              <label class="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" x-model="taxProfile.has_employees" class="rounded border-slate-300" />
+                有员工，需代扣代缴个人所得税
+              </label>
+              <label class="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" x-model="taxProfile.has_business_income" class="rounded border-slate-300" />
+                有经营所得（个体户/合伙企业）
+              </label>
+            </div>
+          </div>
+          <div class="mt-4 flex gap-2">
+            <button @click="saveTaxProfile()" class="btn-primary text-sm px-4 py-2">保存并刷新提醒</button>
+            <button @click="showTaxProfile=false" class="text-sm px-4 py-2 text-slate-500 hover:text-slate-700">收起</button>
+          </div>
+        </div>
+
+        <!-- 汇总条 -->
+        <div class="grid grid-cols-3 gap-3 mb-5">
+          <div class="card border-l-4 border-red-400">
+            <div class="text-xs text-slate-400 mb-1">已逾期</div>
+            <div class="text-xl font-bold text-red-500" x-text="taxData.overdue_count||0"></div>
+          </div>
+          <div class="card border-l-4 border-amber-400">
+            <div class="text-xs text-slate-400 mb-1">待办提醒</div>
+            <div class="text-xl font-bold text-amber-600" x-text="taxData.alert_count||0"></div>
+          </div>
+          <div class="card border-l-4 border-emerald-400">
+            <div class="text-xs text-slate-400 mb-1">本期已申报</div>
+            <div class="text-xl font-bold text-emerald-600" x-text="taxFiledCount"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="flex items-center gap-2 mb-3 flex-wrap">
+            <div class="font-semibold text-sm text-slate-600">申报日历</div>
+            <label class="flex items-center gap-1.5 text-xs text-slate-500 ml-auto">
+              <input type="checkbox" x-model="taxHideFiled" class="rounded border-slate-300" /> 隐藏已申报
+            </label>
+          </div>
+
+          <div class="space-y-2">
+            <template x-for="item in taxVisibleItems" :key="item.code+item.period_key">
+              <div class="flex items-start gap-3 rounded-xl border px-4 py-3"
+                :class="item.status==='filed'    ? 'bg-slate-50 border-slate-150 opacity-70'
+                      : item.status==='overdue'  ? 'bg-red-50 border-red-200'
+                      : item.status==='urgent'   ? 'bg-orange-50 border-orange-200'
+                      : item.status==='due_soon' ? 'bg-amber-50 border-amber-200'
+                                                 : 'bg-white border-slate-150'">
+                <div class="text-center shrink-0 w-14">
+                  <div class="text-[10px] text-slate-400" x-text="item.due_date.slice(0,7)"></div>
+                  <div class="text-lg font-bold leading-none"
+                    :class="item.status==='overdue' ? 'text-red-500' : item.status==='filed' ? 'text-slate-400' : 'text-slate-700'"
+                    x-text="parseInt(item.due_date.slice(8,10))"></div>
+                  <div class="text-[10px] text-slate-400">日截止</div>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-semibold text-sm text-slate-700" x-text="item.name"></span>
+                    <span class="text-xs text-slate-400" x-text="item.period_label"></span>
+                    <span x-show="item.status==='filed'" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">已申报</span>
+                    <span x-show="item.status==='overdue'" class="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700"
+                      x-text="'逾期 '+Math.abs(item.days_left)+' 天'"></span>
+                    <span x-show="item.status==='urgent'" class="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700"
+                      x-text="item.days_left===0 ? '今天截止' : '还剩 '+item.days_left+' 天'"></span>
+                    <span x-show="item.status==='due_soon'" class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700"
+                      x-text="'还剩 '+item.days_left+' 天'"></span>
+                    <span x-show="!item.official_deadline" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500"
+                      title="该年度申报期限国家税务总局尚未公布，此处按“当月15日、遇周末顺延”估算">估算日期</span>
+                    <span x-show="item.local_variance" class="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600"
+                      title="各地征期不同">各地不同</span>
+                  </div>
+                  <div class="text-xs text-slate-500 mt-1" x-text="item.detail"></div>
+                  <div class="text-[10px] text-slate-400 mt-1">
+                    <span x-text="item.legal_basis"></span>
+                    <span x-show="item.source_doc" x-text="'　申报期限依据：'+item.source_doc"></span>
+                  </div>
+                </div>
+                <div class="shrink-0">
+                  <button x-show="isAdmin && item.status!=='filed'" @click="markFiled(item)"
+                    class="text-xs px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 whitespace-nowrap">✓ 标记已申报</button>
+                  <button x-show="isAdmin && item.status==='filed'" @click="unmarkFiled(item)"
+                    class="text-xs px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-600 whitespace-nowrap">撤销</button>
+                </div>
+              </div>
+            </template>
+            <div x-show="!taxVisibleItems.length" class="py-10 text-center text-slate-400 text-sm">
+              未来 120 天内没有待办的申报事项
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-400 leading-relaxed">
+            申报期限依据国家税务总局办公厅《关于明确2026年度申报纳税期限的通知》（税总办征科函〔2025〕64号）。
+            房产税、城镇土地使用税、残保金等税种各地征期存在差异，个别行业另有特殊规定，
+            请以主管税务机关通知为准。本提醒仅供参考，不构成税务意见。
+          </div>
+        </div>
+      </div>
+
       <div x-show="currentPage==='categories'">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-bold text-slate-700">分类管理</h2>
@@ -862,10 +1042,10 @@ function app() {
     queryLoading: false,
     showSQL: false,
     quickQueries: [
-      'H 上个月花了多少？',
+      '上个月一共花了多少？',
       '本月各分类支出汇总',
       '本年度内部垫资合计',
-      'S1 本月客户招待费',
+      '本月客户招待费是多少？',
     ],
 
     // 分类
@@ -900,6 +1080,16 @@ function app() {
 
     // 用户管理
     userList: [],
+
+    // 批量操作
+    selectedIds: [],
+    batchDeleting: false,
+
+    // 税务提醒
+    taxData: { items: [], alert_count: 0, overdue_count: 0 },
+    taxProfile: { filing_period: 'quarter', has_employees: true, has_business_income: false, remind_days: 7, region: '' },
+    showTaxProfile: false,
+    taxHideFiled: false,
     showAddUser: false,
     newUser: { username: '', password: '', role: 'readonly' },
 
@@ -911,6 +1101,7 @@ function app() {
       { page: 'dashboard',    label: '仪表板',  adminOnly: false, icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>' },
       { page: 'quickadd',     label: '快速记账', adminOnly: true,  icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>' },
       { page: 'transactions', label: '账目明细', adminOnly: false, icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>' },
+      { page: 'tax',          label: '税务提醒', adminOnly: false, icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M3 11h18M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>' },
       { page: 'aiquery',      label: 'AI 查询',  adminOnly: false, icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>' },
       { page: 'categories',   label: '分类管理', adminOnly: false, icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>' },
       { page: 'reports',      label: '月报导出', adminOnly: false, icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>' },
@@ -966,7 +1157,108 @@ function app() {
         this.loadAISettings(),
         this.loadLicense(),
         this.loadUsers(),
+        this.loadTaxReminders(),
+        this.loadTaxProfile(),
       ]);
+    },
+
+    get handlerOptions() {
+      const set = new Set();
+      (this.transactions || []).forEach(t => t.handler && set.add(t.handler));
+      (this.userList || []).forEach(u => u.username && set.add(u.username));
+      return [...set].sort();
+    },
+
+    get taxAlerts() {
+      return (this.taxData.items || []).filter(i =>
+        i.status === 'overdue' || i.status === 'urgent' || i.status === 'due_soon');
+    },
+
+    get taxVisibleItems() {
+      const items = this.taxData.items || [];
+      return this.taxHideFiled ? items.filter(i => i.status !== 'filed') : items;
+    },
+
+    get taxFiledCount() {
+      return (this.taxData.items || []).filter(i => i.status === 'filed').length;
+    },
+
+    toggleSelect(id) {
+      const i = this.selectedIds.indexOf(id);
+      if (i === -1) this.selectedIds.push(id); else this.selectedIds.splice(i, 1);
+    },
+
+    toggleSelectAll(checked) {
+      this.selectedIds = checked ? this.transactions.map(t => t.id) : [];
+    },
+
+    async batchDelete() {
+      const n = this.selectedIds.length;
+      if (!n) return;
+      if (!confirm(`确认删除选中的 ${n} 条记录？此操作不可恢复。`)) return;
+      this.batchDeleting = true;
+      try {
+        const res = await this.api('/api/transactions/batch-delete', {
+          method: 'POST',
+          body: JSON.stringify({ ids: this.selectedIds }),
+        });
+        const d = await res.json();
+        if (res.ok) {
+          this.showToast(`已删除 ${d.deleted} 条记录`, 'success');
+          this.selectedIds = [];
+          const now = new Date();
+          await Promise.all([this.loadTransactions(),
+                             this.loadSummary(now.getFullYear(), now.getMonth() + 1)]);
+        } else {
+          this.showToast(d.detail || '批量删除失败', 'error');
+        }
+      } finally {
+        this.batchDeleting = false;
+      }
+    },
+
+    async loadTaxReminders() {
+      try {
+        const res = await this.api('/api/tax/reminders');
+        if (res.ok) this.taxData = await res.json();
+      } catch (e) { /* 提醒失败不影响主流程 */ }
+    },
+
+    async loadTaxProfile() {
+      try {
+        const res = await this.api('/api/tax/profile');
+        if (res.ok) this.taxProfile = await res.json();
+      } catch (e) {}
+    },
+
+    async saveTaxProfile() {
+      const res = await this.api('/api/tax/profile', {
+        method: 'PUT',
+        body: JSON.stringify({
+          filing_period: this.taxProfile.filing_period,
+          has_employees: this.taxProfile.has_employees,
+          has_business_income: this.taxProfile.has_business_income,
+          remind_days: Number(this.taxProfile.remind_days) || 7,
+          region: this.taxProfile.region || '',
+        }),
+      });
+      const d = await res.json();
+      if (res.ok) { this.showToast('设置已保存', 'success'); this.showTaxProfile = false; await this.loadTaxReminders(); }
+      else this.showToast(d.detail || '保存失败', 'error');
+    },
+
+    async markFiled(item) {
+      const res = await this.api('/api/tax/filed', {
+        method: 'POST',
+        body: JSON.stringify({ tax_code: item.code, period_key: item.period_key }),
+      });
+      if (res.ok) { this.showToast('已标记为已申报', 'success'); await this.loadTaxReminders(); }
+    },
+
+    async unmarkFiled(item) {
+      const q = `tax_code=${encodeURIComponent(item.code)}&period_key=${encodeURIComponent(item.period_key)}`;
+      const res = await this.api(`/api/tax/filed?${q}`, { method: 'DELETE' });
+      if (res.ok) { this.showToast('已撤销', 'success'); await this.loadTaxReminders(); }
     },
 
     async api(path, opts = {}) {
@@ -1019,6 +1311,9 @@ function app() {
       if (this.filterMonth)      p.set('month',       this.filterMonth);
       const res = await this.api('/api/transactions/?' + p.toString());
       this.transactions = await res.json();
+      // 丢弃已不在当前筛选结果中的选中项
+      const visible = new Set(this.transactions.map(t => t.id));
+      this.selectedIds = this.selectedIds.filter(id => visible.has(id));
     },
 
     async loadSummary(year, month) {
@@ -1029,7 +1324,8 @@ function app() {
     navigate(page) {
       this.currentPage = page;
       this.mobileMenuOpen = false;
-      if (page === 'transactions') this.loadTransactions();
+      if (page === 'transactions') { this.selectedIds = []; this.loadTransactions(); }
+      if (page === 'tax') { this.loadTaxProfile(); this.loadTaxReminders(); }
       if (page === 'quickadd') this.initManualForm();
       if (page === 'settings') { this.loadAISettings(); this.loadLicense(); this.loadUsers(); }
     },

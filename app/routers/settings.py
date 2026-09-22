@@ -115,3 +115,24 @@ def clear_license_key(_: User = Depends(require_admin)):
     s.pop("license_key", None)
     write_settings(s)
     return {"ok": True}
+
+
+@router.get("/self-check")
+def self_check(_: User = Depends(require_admin)):
+    """环境自检：中文 PDF 字体、数据目录、AI 配置。客户报障时先看这里。"""
+    import sys
+    from app.utils.pdf_gen import font_status
+    from app.utils.license import validate_license
+
+    data_dir = get_data_dir()
+    s = read_settings()
+    fonts = font_status()
+    return {
+        "platform": sys.platform,
+        "python": sys.version.split()[0],
+        "data_dir": str(data_dir),
+        "db_exists": (data_dir / "zhanno_finance.db").exists(),
+        "pdf_font": fonts,
+        "ai_key_configured": bool(s.get("api_key") or config.MINIMAX_API_KEY),
+        "ai_license": validate_license(s.get("license_key", "")),
+    }

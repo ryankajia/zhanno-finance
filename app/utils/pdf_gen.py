@@ -10,22 +10,59 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from pypdf import PdfWriter, PdfReader
 
+# 中文字体候选（按平台）。缺少中文字体时 PDF 里的汉字会变成空白/方块，
+# 因此 Windows / Linux 的常见字体必须一并列出。
+_WIN_FONTS = os.path.join(os.environ.get("WINDIR", r"C:\\Windows"), "Fonts")
+
 _FONT_CANDIDATES = [
+    # ── macOS ──
     "/System/Library/Fonts/PingFang.ttc",
     "/System/Library/Fonts/Supplemental/PingFang.ttc",
-    "/Library/Fonts/Arial Unicode MS.ttf",
     "/System/Library/Fonts/STHeiti Light.ttc",
+    "/Library/Fonts/Arial Unicode MS.ttf",
+    # ── Windows ──
+    os.path.join(_WIN_FONTS, "msyh.ttc"),      # 微软雅黑
+    os.path.join(_WIN_FONTS, "msyh.ttf"),
+    os.path.join(_WIN_FONTS, "msyhl.ttc"),
+    os.path.join(_WIN_FONTS, "simhei.ttf"),    # 黑体
+    os.path.join(_WIN_FONTS, "simsun.ttc"),    # 宋体
+    os.path.join(_WIN_FONTS, "simkai.ttf"),    # 楷体
+    os.path.join(_WIN_FONTS, "Deng.ttf"),      # 等线
+    # ── Linux ──
     "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+    "/usr/share/fonts/truetype/arphic/uming.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
 ]
+
 _FONT_NAME = "Helvetica"
+_FONT_PATH = None
 for _path in _FONT_CANDIDATES:
     if os.path.exists(_path):
         try:
-            pdfmetrics.registerFont(TTFont("CJK", _path))
+            # .ttc 字体集合需指定子字体索引
+            if _path.lower().endswith(".ttc"):
+                pdfmetrics.registerFont(TTFont("CJK", _path, subfontIndex=0))
+            else:
+                pdfmetrics.registerFont(TTFont("CJK", _path))
             _FONT_NAME = "CJK"
+            _FONT_PATH = _path
             break
         except Exception:
             continue
+
+
+def font_status() -> dict:
+    """供「系统设置」页自检：确认当前系统能否正确导出中文 PDF。"""
+    return {
+        "font_name": _FONT_NAME,
+        "font_path": _FONT_PATH,
+        "cjk_ok": _FONT_NAME == "CJK",
+        "message": (
+            f"中文字体已加载：{_FONT_PATH}" if _FONT_NAME == "CJK"
+            else "未找到中文字体，导出的 PDF 中汉字可能显示为空白，请安装中文字体后重试"
+        ),
+    }
 
 
 def _style(name: str, parent_name: str, **kwargs) -> ParagraphStyle:

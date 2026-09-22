@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from app.database import create_tables
-from app.routers import auth, transactions, categories, ai, reports, settings, users
+from app.routers import auth, transactions, categories, ai, reports, settings, users, tax
 from app.utils.app_paths import get_static_dir
 from init_data import init_data
 
@@ -46,6 +46,7 @@ app.include_router(ai.router,           prefix="/api/ai",           tags=["AI"])
 app.include_router(reports.router,      prefix="/api/reports",      tags=["报告"])
 app.include_router(settings.router,     prefix="/api/settings",     tags=["设置"])
 app.include_router(users.router,        prefix="/api/users",        tags=["用户管理"])
+app.include_router(tax.router,          prefix="/api/tax",          tags=["税务提醒"])
 
 app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
