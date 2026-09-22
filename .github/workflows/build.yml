@@ -27,6 +27,7 @@ jobs:
             exit 1
           fi
           echo "✅ 源码中未发现硬编码 API Key"
+        shell: bash
 
       - name: 打包 .app
         run: pyinstaller zhanno.spec --noconfirm
@@ -71,6 +72,7 @@ jobs:
             exit 1
           fi
           echo "✅ 源码中未发现硬编码 API Key"
+        shell: bash
 
       - name: 打包 .exe
         run: pyinstaller zhanno.spec --noconfirm
