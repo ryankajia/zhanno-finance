@@ -14,6 +14,7 @@ _db_path = _data_dir / "zhanno_finance.db"
 DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{_db_path}")
 ENCRYPTION_KEY: str | None = os.getenv("ENCRYPTION_KEY")
 
-from app.utils.bundled_config import BUNDLED_MINIMAX_KEY, BUNDLED_MINIMAX_GROUP_ID
-MINIMAX_API_KEY: str | None = os.getenv("MINIMAX_API_KEY") or BUNDLED_MINIMAX_KEY or None
-MINIMAX_GROUP_ID: str | None = os.getenv("MINIMAX_GROUP_ID") or BUNDLED_MINIMAX_GROUP_ID or None
+# AI 凭据只来自用户自己的配置，绝不随安装包分发。
+# 优先级：用户在「系统设置」中填写的 Key（ai_settings.json）> 本机 .env（仅开发用）。
+MINIMAX_API_KEY: str | None = os.getenv("MINIMAX_API_KEY") or None
+MINIMAX_GROUP_ID: str | None = os.getenv("MINIMAX_GROUP_ID") or None

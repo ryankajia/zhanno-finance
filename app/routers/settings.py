@@ -39,7 +39,7 @@ def get_ai_config(_: User = Depends(require_admin)):
     if key:
         preview = key[:4] + "****"
     elif config.MINIMAX_API_KEY:
-        preview = "内置密钥"
+        preview = "本机 .env（开发用）"
     return {
         "provider": s.get("provider", "minimax"),
         "api_key_set": has_key,
