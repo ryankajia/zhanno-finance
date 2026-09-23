@@ -20,3 +20,6 @@ dist/
 
 # 授权码签名密钥，绝不提交
 .license_secret
+
+# 授权码发放台账，含客户信息，不提交
+licenses.csv

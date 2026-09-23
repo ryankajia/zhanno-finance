@@ -9,7 +9,8 @@
 import re
 from datetime import date, datetime
 
-_FORMAT = re.compile(r"^ZN-(\d{8})-([A-F0-9]{8})$")
+# 新格式 ZN-YYYYMMDD-SERIAL-CHECKSUM；旧格式 ZN-YYYYMMDD-CHECKSUM（兼容）
+_FORMAT = re.compile(r"^ZN-(\d{8})-(?:[0-9A-Z]{4}-)?[A-F0-9]{8}$")
 
 
 def parse_format(key: str) -> tuple[bool, str]:

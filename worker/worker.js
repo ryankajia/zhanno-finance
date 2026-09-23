@@ -25,13 +25,14 @@ function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: JSON_HEADERS });
 }
 
-/** HMAC-SHA256('ZN-YYYYMMDD')，取前 8 位十六进制大写 —— 与 Python 端算法一致 */
-async function sign(d8, secret) {
+/** HMAC-SHA256('ZN-YYYYMMDD' 或 'ZN-YYYYMMDD-SERIAL')，取前 8 位十六进制大写
+ *  —— 与 Python 端算法一致 */
+async function sign(payload, secret) {
   const key = await crypto.subtle.importKey(
     "raw", new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
   );
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`ZN-${d8}`));
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
   return [...new Uint8Array(sig)]
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("")
@@ -63,11 +64,20 @@ async function validateLicense(rawKey, env) {
     return { valid: false, expires: "", message: "该授权码已被停用，请联系卖家" };
   }
 
-  const m = key.match(/^ZN-(\d{8})-([A-F0-9]{8})$/);
-  if (!m) return { valid: false, expires: "", message: "授权码格式不正确" };
+  // 新格式 ZN-YYYYMMDD-SERIAL-CHECKSUM（每客户唯一）
+  // 旧格式 ZN-YYYYMMDD-CHECKSUM（兼容早期已发出的码）
+  let d8, serial = null, checksum;
+  let m = key.match(/^ZN-(\d{8})-([0-9A-Z]{4})-([A-F0-9]{8})$/);
+  if (m) {
+    [, d8, serial, checksum] = m;
+  } else {
+    m = key.match(/^ZN-(\d{8})-([A-F0-9]{8})$/);
+    if (!m) return { valid: false, expires: "", message: "授权码格式不正确" };
+    [, d8, checksum] = m;
+  }
 
-  const [, d8, checksum] = m;
-  const expect = await sign(d8, env.LICENSE_SECRET);
+  const payload = serial ? `ZN-${d8}-${serial}` : `ZN-${d8}`;
+  const expect = await sign(payload, env.LICENSE_SECRET);
   if (!timingSafeEqual(checksum, expect)) {
     return { valid: false, expires: "", message: "授权码无效（验证失败）" };
   }
