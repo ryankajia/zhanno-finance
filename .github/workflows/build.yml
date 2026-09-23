@@ -77,6 +77,56 @@ jobs:
       - name: 打包 .exe
         run: pyinstaller zhanno.spec --noconfirm
 
+      - name: 冒烟测试：在真实 Windows 上运行 exe 并验证能提供服务
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $exe = "dist\湛诺财务系统\湛诺财务系统.exe"
+          if (-not (Test-Path $exe)) { Write-Error "找不到 exe：$exe"; exit 1 }
+
+          Write-Host "启动 $exe ..."
+          $proc = Start-Process -FilePath $exe -PassThru
+          Write-Host "进程 PID: $($proc.Id)"
+
+          $ok = $false
+          for ($i = 1; $i -le 30; $i++) {
+            Start-Sleep -Seconds 2
+            if ($proc.HasExited) {
+              Write-Host "::error::进程在 $($i*2) 秒后自行退出，退出码 $($proc.ExitCode)"
+              break
+            }
+            try {
+              $r = Invoke-WebRequest -Uri "http://127.0.0.1:8000/" -TimeoutSec 5 -UseBasicParsing
+              if ($r.StatusCode -eq 200) {
+                Write-Host "✅ 第 $($i*2) 秒：首页返回 200，长度 $($r.Content.Length)"
+                $ok = $true; break
+              }
+            } catch { }
+          }
+
+          if ($ok) {
+            # 再验证登录接口，确认后端真的活着
+            try {
+              $body = '{"username":"admin","password":"123456"}'
+              $login = Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/auth/login" `
+                -Method POST -ContentType "application/json" -Body $body `
+                -TimeoutSec 10 -UseBasicParsing
+              Write-Host "✅ 登录接口返回 $($login.StatusCode)"
+            } catch {
+              Write-Host "::error::登录接口失败: $_"
+              $ok = $false
+            }
+          }
+
+          Write-Host "`n--- run.log ---"
+          $log = Join-Path $env:APPDATA "湛诺财务系统\run.log"
+          if (Test-Path $log) { Get-Content $log } else { Write-Host "(未生成 run.log)" }
+
+          if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+
+          if (-not $ok) { Write-Error "❌ Windows 冒烟测试失败：exe 未能提供服务"; exit 1 }
+          Write-Host "`n✅ Windows 冒烟测试通过"
+
       - name: 制作安装包 (zip)
         run: |
           Copy-Item "交付物\使用说明.html" -Destination "dist\湛诺财务系统\" -ErrorAction SilentlyContinue
