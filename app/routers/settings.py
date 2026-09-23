@@ -69,6 +69,7 @@ def clear_ai_key(_: User = Depends(require_admin)):
 
 @router.post("/ai/test")
 async def test_ai_connection(_: User = Depends(require_admin)):
+    """连通性自测：实际发一条最短的请求，验证授权码 + 网络 + 上游都正常。"""
     from app.utils.minimax import chat_completion
     try:
         result = await chat_completion(
@@ -88,23 +89,38 @@ class LicenseBody(BaseModel):
 
 @router.get("/license")
 def get_license_status(_: User = Depends(require_admin)):
-    from app.utils.license import validate_license
+    """本地缓存的授权状态（真伪以中转服务为准）。"""
+    from app.utils.license import local_status
     s = read_settings()
     key = s.get("license_key", "")
-    result = validate_license(key)
     preview = (key[:6] + "****") if key else ""
-    return {"key_preview": preview, **result}
+    return {"key_preview": preview, **local_status(s)}
 
 
 @router.post("/license")
-def set_license_key(body: LicenseBody, _: User = Depends(require_admin)):
-    from app.utils.license import validate_license
+async def set_license_key(body: LicenseBody, _: User = Depends(require_admin)):
+    """激活授权码：请求中转服务校验，通过后保存到期日。"""
+    from app.utils.license import parse_format
+    from app.utils.minimax import verify_license_remote
+
     key = body.key.strip().upper()
-    result = validate_license(key)
-    if not result["valid"]:
-        raise HTTPException(status_code=400, detail=result["message"])
+    ok, _expires = parse_format(key)
+    if not ok:
+        raise HTTPException(status_code=400, detail="授权码格式不正确")
+
     s = read_settings()
+    try:
+        result = await verify_license_remote(key, s)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"无法连接授权服务器：{e}")
+
+    if not result.get("valid"):
+        raise HTTPException(status_code=400, detail=result.get("message", "授权码无效"))
+
     s["license_key"] = key
+    s["license_expires"] = result.get("expires", "")
+    s["license_verified"] = True
+    s.setdefault("provider", "zhanno")
     write_settings(s)
     return {"ok": True, **result}
 
@@ -112,27 +128,30 @@ def set_license_key(body: LicenseBody, _: User = Depends(require_admin)):
 @router.delete("/license")
 def clear_license_key(_: User = Depends(require_admin)):
     s = read_settings()
-    s.pop("license_key", None)
+    for k in ("license_key", "license_expires", "license_verified"):
+        s.pop(k, None)
     write_settings(s)
     return {"ok": True}
 
 
 @router.get("/self-check")
 def self_check(_: User = Depends(require_admin)):
-    """环境自检：中文 PDF 字体、数据目录、AI 配置。客户报障时先看这里。"""
+    """环境自检：中文 PDF 字体、数据目录、AI 授权与服务地址。客户报障时先看这里。"""
     import sys
     from app.utils.pdf_gen import font_status
-    from app.utils.license import validate_license
+    from app.utils.license import local_status
+    from app.utils.minimax import worker_url
 
     data_dir = get_data_dir()
     s = read_settings()
-    fonts = font_status()
     return {
         "platform": sys.platform,
         "python": sys.version.split()[0],
         "data_dir": str(data_dir),
         "db_exists": (data_dir / "zhanno_finance.db").exists(),
-        "pdf_font": fonts,
-        "ai_key_configured": bool(s.get("api_key") or config.MINIMAX_API_KEY),
-        "ai_license": validate_license(s.get("license_key", "")),
+        "pdf_font": font_status(),
+        "ai_provider": s.get("provider", "zhanno"),
+        "ai_service_url": worker_url(s),
+        "ai_license": local_status(s),
+        "client_holds_api_key": bool(s.get("api_key")),
     }

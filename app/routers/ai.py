@@ -33,10 +33,14 @@ _DANGEROUS_SQL = ["DROP", "DELETE", "UPDATE", "INSERT", "CREATE", "ALTER", "TRUN
 
 
 def _check_ai_license():
+    """本地快速拦截，避免明显无效时还发网络请求。
+
+    真正的授权判定在中转服务端完成——即使有人绕过这里，
+    Worker 仍会拒绝无效授权码，因此不存在被破解的风险。
+    """
     from app.routers.settings import read_settings
-    from app.utils.license import validate_license
-    s = read_settings()
-    result = validate_license(s.get("license_key", ""))
+    from app.utils.license import local_status
+    result = local_status(read_settings())
     if not result["valid"]:
         raise HTTPException(status_code=403, detail=f"AI 功能未授权：{result['message']}")
 

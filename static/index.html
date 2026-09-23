@@ -755,23 +755,60 @@
       <div x-show="currentPage==='settings'">
         <h2 class="text-lg font-bold mb-4 text-slate-700">系统设置</h2>
 
+        <!-- AI 授权码 -->
+        <div class="max-w-lg card mb-4" x-show="currentUser && currentUser.role==='admin'">
+          <div class="flex items-center gap-2 mb-4">
+            <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+            <span class="font-semibold text-slate-700">AI 功能授权</span>
+          </div>
+
+          <!-- 状态显示 -->
+          <div class="mb-4 px-3 py-2.5 rounded-xl text-sm flex items-center gap-2"
+            :class="licenseStatus && licenseStatus.valid ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'">
+            <span x-show="licenseStatus && licenseStatus.valid">
+              ✓ <span x-text="licenseStatus && licenseStatus.message"></span>
+              <span class="opacity-60 ml-1 text-xs" x-text="licenseStatus && licenseStatus.key_preview ? '(' + licenseStatus.key_preview + ')' : ''"></span>
+            </span>
+            <span x-show="!licenseStatus || !licenseStatus.valid">
+              ✗ <span x-text="licenseStatus ? licenseStatus.message : '加载中...'"></span>
+            </span>
+          </div>
+
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1.5">粘贴授权码</label>
+              <input type="text" x-model="licenseKeyInput"
+                class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono uppercase"
+                placeholder="ZN-YYYYMMDD-XXXXXXXX" autocomplete="off" />
+              <div class="text-xs text-slate-400 mt-1">每月付费后收到新授权码，粘贴此处即可开启 AI 功能</div>
+            </div>
+            <button @click="saveLicense()" :disabled="settingsLoading || !licenseKeyInput.trim()"
+              class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-semibold rounded-xl py-2.5 text-sm transition-colors">
+              激活授权码
+            </button>
+          </div>
+        </div>
+
         <!-- AI 接口配置（默认折叠，仅供管理员高级配置） -->
         <div class="max-w-lg card mb-4" x-show="currentUser && currentUser.role==='admin'">
           <button @click="showAIConfig=!showAIConfig" class="w-full flex items-center justify-between">
             <div class="flex items-center gap-2">
               <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
-              <span class="text-sm text-slate-500">高级配置：AI 接口设置</span>
+              <span class="text-sm text-slate-500">高级配置：自备大模型接口（一般无需设置）</span>
             </div>
             <svg class="w-4 h-4 text-slate-400 transition-transform" :class="showAIConfig ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
           </button>
 
           <div x-show="showAIConfig" x-transition class="mt-4 space-y-4">
-            <div class="px-3 py-2.5 rounded-xl text-sm flex items-center gap-2"
-              :class="aiSettings.api_key_set ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'">
-              <span x-show="aiSettings.api_key_set">✓ AI 接口已配置
+            <div class="px-3 py-2.5 rounded-xl text-sm bg-slate-50 text-slate-600 leading-relaxed">
+              <span x-show="!aiSettings.api_key_set">
+                默认情况下 AI 功能由官方服务提供，<b>你只需要在上方填写授权码即可</b>，这里无需任何设置。<br />
+                仅当你希望改用自己的大模型账号时，才需要在下面填写自己的 API Key。
+              </span>
+              <span x-show="aiSettings.api_key_set" class="text-green-700">
+                ✓ 已改用自备接口
                 <span class="opacity-60 ml-1 text-xs" x-text="'(' + aiSettings.api_key_preview + ')'"></span>
               </span>
-              <span x-show="!aiSettings.api_key_set">⚠ 未配置 API Key</span>
             </div>
             <div>
               <label class="block text-xs text-slate-500 mb-1.5">AI 服务商</label>
@@ -805,40 +842,6 @@
                 测试
               </button>
             </div>
-          </div>
-        </div>
-
-        <!-- AI 授权码 -->
-        <div class="max-w-lg card mb-4" x-show="currentUser && currentUser.role==='admin'">
-          <div class="flex items-center gap-2 mb-4">
-            <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-            <span class="font-semibold text-slate-700">AI 功能授权</span>
-          </div>
-
-          <!-- 状态显示 -->
-          <div class="mb-4 px-3 py-2.5 rounded-xl text-sm flex items-center gap-2"
-            :class="licenseStatus && licenseStatus.valid ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'">
-            <span x-show="licenseStatus && licenseStatus.valid">
-              ✓ <span x-text="licenseStatus && licenseStatus.message"></span>
-              <span class="opacity-60 ml-1 text-xs" x-text="licenseStatus && licenseStatus.key_preview ? '(' + licenseStatus.key_preview + ')' : ''"></span>
-            </span>
-            <span x-show="!licenseStatus || !licenseStatus.valid">
-              ✗ <span x-text="licenseStatus ? licenseStatus.message : '加载中...'"></span>
-            </span>
-          </div>
-
-          <div class="space-y-3">
-            <div>
-              <label class="block text-xs text-slate-500 mb-1.5">粘贴授权码</label>
-              <input type="text" x-model="licenseKeyInput"
-                class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono uppercase"
-                placeholder="ZN-YYYYMM-XXXXXXXX" autocomplete="off" />
-              <div class="text-xs text-slate-400 mt-1">每月付费后收到新授权码，粘贴此处即可开启 AI 功能</div>
-            </div>
-            <button @click="saveLicense()" :disabled="settingsLoading || !licenseKeyInput.trim()"
-              class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-semibold rounded-xl py-2.5 text-sm transition-colors">
-              激活授权码
-            </button>
           </div>
         </div>
 
@@ -921,7 +924,7 @@
           <div class="text-sm text-slate-500 space-y-1.5">
             <div>湛诺财务系统 <span class="text-slate-400 text-xs">v1.0</span></div>
             <div class="text-xs text-slate-400">数据本地存储，永不上传云端</div>
-            <div class="text-xs text-slate-400">AI 自然语言记账 · 支持 MiniMax / DeepSeek</div>
+            <div class="text-xs text-slate-400">AI 自然语言记账 · 授权码激活即可使用</div>
           </div>
         </div>
       </div>

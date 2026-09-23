@@ -1,0 +1,13 @@
+name = "zhanno-ai"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+AI_PROVIDER = "deepseek"
+AI_MODEL = "deepseek-chat"
+BLOCKED_CODES = ""
+# MINIMAX_GROUP_ID = ""   # 仅 AI_PROVIDER = "minimax" 时需要
+
+# 以下为 Secret，不写在这里，用命令设置：
+#   npx wrangler secret put LICENSE_SECRET
+#   npx wrangler secret put AI_API_KEY
