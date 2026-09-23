@@ -1,8 +1,48 @@
 """湛诺财务系统入口 —— python main.py"""
 import os
 import socket
+import sys
 import threading
 import webbrowser
+
+
+def _fix_std_streams():
+    """Windows 上以窗口模式（console=False）打包运行时，PyInstaller 会把
+    sys.stdout / sys.stderr 置为 None。uvicorn 配置日志时会调用
+    sys.stdout.isatty()，导致启动即崩溃：
+        AttributeError: 'NoneType' object has no attribute 'isatty'
+        ValueError: Unable to configure formatter 'default'
+    这里把空流接到用户数据目录下的 run.log，既避免崩溃，
+    也方便客户报障时让他把这个文件发回来排查。
+    """
+    if sys.stdout is not None and sys.stderr is not None:
+        return
+
+    stream = None
+    try:
+        from pathlib import Path
+        if sys.platform == "win32":
+            base = Path(os.environ.get("APPDATA", Path.home())) / "湛诺财务系统"
+        elif sys.platform == "darwin":
+            base = Path.home() / "Library" / "Application Support" / "湛诺财务系统"
+        else:
+            base = Path.home() / ".湛诺财务系统"
+        base.mkdir(parents=True, exist_ok=True)
+        stream = open(base / "run.log", "a", encoding="utf-8", buffering=1)
+    except Exception:
+        try:
+            stream = open(os.devnull, "w")
+        except Exception:
+            return
+
+    if sys.stdout is None:
+        sys.stdout = stream
+    if sys.stderr is None:
+        sys.stderr = stream
+
+
+# 必须最先执行：后续任何 import 或 print 都可能用到标准输出
+_fix_std_streams()
 
 # 必须在所有 app 模块导入前运行，确保 .env 存在
 from init_data import bootstrap_env
