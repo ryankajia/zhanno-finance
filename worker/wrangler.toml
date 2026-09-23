@@ -3,11 +3,12 @@ main = "worker.js"
 compatibility_date = "2026-09-01"
 
 [vars]
-AI_PROVIDER = "deepseek"
-AI_MODEL = "deepseek-chat"
+AI_PROVIDER = "minimax"
+AI_MODEL = "abab6.5s-chat"
+# 被滥用需停用的授权码，逗号分隔，改完要重新 deploy
 BLOCKED_CODES = ""
-# MINIMAX_GROUP_ID = ""   # 仅 AI_PROVIDER = "minimax" 时需要
 
-# 以下为 Secret，不写在这里，用命令设置：
-#   npx wrangler secret put LICENSE_SECRET
-#   npx wrangler secret put AI_API_KEY
+# 以下三项是 Secret，不写在这个文件里，用命令单独设置：
+#   npx wrangler secret put LICENSE_SECRET     授权码签名密钥
+#   npx wrangler secret put AI_API_KEY         你的 MiniMax Key
+#   npx wrangler secret put MINIMAX_GROUP_ID   你的 MiniMax GroupId
