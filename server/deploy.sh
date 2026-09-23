@@ -34,7 +34,13 @@ echo "  ✅ 完成"
 mkdir -p "$CFG_DIR" "$APP_DIR"
 chmod 700 "$CFG_DIR"
 
-if [ -f "$CFG_DIR/config.env" ]; then
+if [ -f /tmp/zhanno-secrets.env ]; then
+  # 由本地一并上传，免去手动粘贴三项密钥
+  echo "▶ 使用随包上传的配置文件…"
+  install -m 600 /tmp/zhanno-secrets.env "$CFG_DIR/config.env"
+  shred -u /tmp/zhanno-secrets.env 2>/dev/null || rm -f /tmp/zhanno-secrets.env
+  echo "  ✅ 已写入 $CFG_DIR/config.env，临时文件已安全删除"
+elif [ -f "$CFG_DIR/config.env" ]; then
   echo "▶ 检测到已有配置，跳过密钥输入（如需重填：rm $CFG_DIR/config.env 后重跑）"
 else
   echo

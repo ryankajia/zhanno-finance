@@ -11,6 +11,7 @@ a = Analysis(
     binaries=[],
     datas=[
         ('static', 'static'),          # 前端资源（HTML / JS / CSS）
+        ('app/certs', 'certs'),        # 中转服务证书（客户端固定信任）
     ],
     hiddenimports=[
         # uvicorn 动态加载的模块

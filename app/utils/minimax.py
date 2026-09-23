@@ -12,12 +12,27 @@ provider 取值：
 import json
 import os
 import httpx
+from pathlib import Path
 from app import config
 from app.utils.app_paths import get_data_dir
 
-# 中转服务地址。部署后如域名不同，可在 ai_settings.json 里用 worker_url 覆盖，
-# 或设置环境变量 ZHANNO_AI_URL。
-DEFAULT_WORKER_URL = "https://zhanno-ai.ryankajia.workers.dev"
+# 中转服务地址。可在 ai_settings.json 里用 worker_url 覆盖，或设环境变量 ZHANNO_AI_URL。
+# 国内服务器（腾讯云上海），使用自签名证书 + 客户端固定信任：
+# 证书随程序分发，客户端只认这一张，中间人无法伪造。
+DEFAULT_WORKER_URL = "https://43.142.142.229:8443"
+
+def _cert_path() -> str | None:
+    """返回随程序分发的服务器证书路径（PyInstaller 打包后在 _MEIPASS 下）。"""
+    import sys
+    candidates = []
+    if hasattr(sys, "_MEIPASS"):
+        candidates.append(Path(sys._MEIPASS) / "certs" / "zhanno-server.crt")
+    candidates.append(Path(__file__).parent.parent / "certs" / "zhanno-server.crt")
+    for c in candidates:
+        if c.exists():
+            return str(c)
+    return None
+
 
 _BASE_MINIMAX = "https://api.minimax.chat/v1/text/chatcompletion_v2"
 _BASE_DEEPSEEK = "https://api.deepseek.com/chat/completions"
@@ -41,7 +56,8 @@ def worker_url(s: dict | None = None) -> str:
 async def verify_license_remote(license_key: str, s: dict | None = None) -> dict:
     """请求中转服务校验授权码（不消耗 token）。"""
     url = f"{worker_url(s)}/v1/verify"
-    async with httpx.AsyncClient(timeout=15) as client:
+    verify = _cert_path() or True          # 有证书就固定信任它
+    async with httpx.AsyncClient(timeout=15, verify=verify) as client:
         resp = await client.post(url, json={"license": license_key})
     if resp.status_code >= 500:
         raise ValueError("授权服务器暂时不可用，请稍后重试")
@@ -69,8 +85,9 @@ async def _via_proxy(messages: list, max_tokens: int, s: dict) -> str:
         raise ValueError("未设置 AI 授权码，请在「系统设置 → AI 功能授权」中激活")
 
     url = f"{worker_url(s)}/v1/chat"
+    verify = _cert_path() or True
     try:
-        async with httpx.AsyncClient(timeout=45) as client:
+        async with httpx.AsyncClient(timeout=45, verify=verify) as client:
             resp = await client.post(url, json={
                 "license": license_key,
                 "messages": messages,
