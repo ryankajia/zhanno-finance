@@ -98,8 +98,26 @@
         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
         <span>退出登录</span>
       </div>
+      <div @click="quitApp()" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-400 hover:bg-slate-700 hover:text-white transition-all cursor-pointer text-sm">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.636 5.636a9 9 0 1012.728 0M12 3v9"/></svg>
+        <span>关闭程序</span>
+      </div>
     </div>
   </aside>
+
+  <!-- 程序已关闭提示 -->
+  <div x-show="appClosed" x-cloak
+    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/95 text-center px-6">
+    <div>
+      <div class="text-5xl mb-4">👋</div>
+      <div class="text-xl font-bold text-white mb-2">湛诺财务系统已关闭</div>
+      <div class="text-slate-400 text-sm leading-relaxed">
+        你的账目数据已安全保存在本机。<br />
+        可以直接关掉这个浏览器标签页了。<br /><br />
+        下次使用，双击桌面上的「湛诺财务系统」图标即可。
+      </div>
+    </div>
+  </div>
 
   <!-- 主内容区 -->
   <div class="flex-1 flex flex-col overflow-hidden">
@@ -1092,6 +1110,7 @@ function app() {
     taxData: { items: [], alert_count: 0, overdue_count: 0 },
     taxProfile: { filing_period: 'quarter', has_employees: true, has_business_income: false, remind_days: 7, region: '' },
     showTaxProfile: false,
+    appClosed: false,
     taxHideFiled: false,
     showAddUser: false,
     newUser: { username: '', password: '', role: 'readonly' },
@@ -1218,6 +1237,14 @@ function app() {
       } finally {
         this.batchDeleting = false;
       }
+    },
+
+    async quitApp() {
+      if (!confirm('确认关闭湛诺财务系统？\n\n关闭后需要重新双击桌面图标才能使用。\n你的账目数据不会丢失。')) return;
+      try {
+        await this.api('/api/settings/shutdown', { method: 'POST' });
+      } catch (e) { /* 服务已退出，请求中断属正常 */ }
+      this.appClosed = true;
     },
 
     async loadTaxReminders() {

@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from app.auth import require_admin
+from app.auth import require_admin, get_current_user
 from app.models import User
 from app import config
 from app.utils.app_paths import get_data_dir
@@ -155,3 +155,18 @@ def self_check(_: User = Depends(require_admin)):
         "ai_license": local_status(s),
         "client_holds_api_key": bool(s.get("api_key")),
     }
+
+
+@router.post("/shutdown")
+def shutdown_app(_: User = Depends(get_current_user)):
+    """关闭程序。窗口模式下没有界面，这是客户唯一能正常退出的方式。"""
+    import os
+    import threading
+    import time
+
+    def _stop():
+        time.sleep(0.6)      # 先把响应发回浏览器，再退出
+        os._exit(0)
+
+    threading.Thread(target=_stop, daemon=True).start()
+    return {"ok": True, "message": "程序正在关闭"}
