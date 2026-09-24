@@ -112,9 +112,9 @@
       <div class="text-5xl mb-4">👋</div>
       <div class="text-xl font-bold text-white mb-2">湛诺财务系统已关闭</div>
       <div class="text-slate-400 text-sm leading-relaxed">
-        你的账目数据已安全保存在本机。<br />
+        你的账目数据已安全保存在本机，不会丢失。<br />
         可以直接关掉这个浏览器标签页了。<br /><br />
-        下次使用，双击桌面上的「湛诺财务系统」图标即可。
+        下次使用，双击「湛诺财务系统」图标即可重新打开。
       </div>
     </div>
   </div>
@@ -1160,7 +1160,31 @@ function app() {
     },
 
     // ── 方法 ──
+    // 向本机程序报告"这个页面还开着"。页面关闭后程序据此自动退出，
+    // 客户不必再去任务管理器结束进程。
+    _startHeartbeat() {
+      const tab = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      let fails = 0;
+      const beat = async () => {
+        try {
+          await fetch('/api/heartbeat?t=' + tab, { method: 'POST' });
+          fails = 0;
+        } catch (e) {
+          // 连续失败说明程序已经退出（例如久未使用被自动关闭），给出明确提示
+          if (++fails >= 3) this.appClosed = true;
+        }
+      };
+      beat();
+      setInterval(beat, 10000);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) beat(); });
+      window.addEventListener('pageshow', beat);
+      window.addEventListener('pagehide', () => {
+        try { navigator.sendBeacon('/api/bye?t=' + tab); } catch (e) {}
+      });
+    },
+
     async init() {
+      this._startHeartbeat();
       const t = localStorage.getItem('zn_token');
       const u = localStorage.getItem('zn_user');
       if (t) {

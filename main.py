@@ -110,6 +110,89 @@ def root():
     return FileResponse(os.path.join(_STATIC_DIR, "index.html"))
 
 
+# ── 浏览器关闭后自动退出 ─────────────────────────────────────
+# 窗口模式的程序没有界面，客户关掉浏览器时进程仍在后台运行，
+# 会一直锁住程序文件夹（提示"已在另一个程序中打开"）。
+# 做法：每个打开的页面每 10 秒发一次心跳，页面关闭时发一次"告别"；
+# 所有页面都消失且超过宽限期，就自动退出。
+import time
+
+_TABS: dict = {}                              # 页面ID -> 最近一次心跳时间
+_WATCH = {"ever": False, "empty_since": None, "started": time.monotonic()}
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, default))
+    except ValueError:
+        return default
+
+
+@app.get("/api/ping")
+def ping():
+    """供第二次双击启动时探测「是不是已经有一个在运行」。"""
+    return {"ok": True, "app": "zhanno-finance"}
+
+
+@app.post("/api/heartbeat")
+def heartbeat(t: str = ""):
+    if t:
+        if len(_TABS) > 200:                  # 防止局域网内被刷爆内存
+            _TABS.pop(next(iter(_TABS)), None)
+        _TABS[t[:64]] = time.monotonic()
+        _WATCH["ever"] = True
+        _WATCH["empty_since"] = None
+    return {"ok": True}
+
+
+@app.post("/api/bye")
+def bye(t: str = ""):
+    _TABS.pop(t[:64], None)
+    return {"ok": True}
+
+
+def _watchdog():
+    stale = _env_int("ZHANNO_STALE_SECONDS", 180)    # 页面失联多久视为已消失
+    grace = _env_int("ZHANNO_BYE_GRACE", 8)          # 最后一个页面消失后的宽限期
+    never = _env_int("ZHANNO_NEVER_SECONDS", 600)    # 一直没人打开页面就退出
+    last = time.monotonic()
+    while True:
+        time.sleep(1)
+        now = time.monotonic()
+        if now - last > 30:                   # 电脑休眠/挂起后恢复，别误判
+            for k in list(_TABS):
+                _TABS[k] = now
+            _WATCH["empty_since"] = None
+            _WATCH["started"] = now
+        last = now
+
+        for k, v in list(_TABS.items()):
+            if now - v > stale:
+                _TABS.pop(k, None)
+
+        if _TABS:
+            _WATCH["empty_since"] = None
+        elif _WATCH["ever"]:
+            if _WATCH["empty_since"] is None:
+                _WATCH["empty_since"] = now
+            elif now - _WATCH["empty_since"] >= grace:
+                print("浏览器已关闭，程序自动退出")
+                os._exit(0)
+        elif now - _WATCH["started"] > never:
+            print("长时间无人使用，程序自动退出")
+            os._exit(0)
+
+
+def _already_running(port: int = 8000) -> bool:
+    import json
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/ping", timeout=2) as r:
+            return json.loads(r.read()).get("app") == "zhanno-finance"
+    except Exception:
+        return False
+
+
 def _alert(title: str, message: str) -> None:
     """在窗口模式下弹出系统对话框。没有控制台时这是唯一能让用户看到问题的方式。"""
     try:
@@ -161,6 +244,8 @@ def _open_browser(port: int):
     import time
     import urllib.request
 
+    if os.environ.get("ZHANNO_NO_BROWSER"):
+        return
     url = f"http://localhost:{port}"
     for _ in range(40):                      # 最多等 20 秒
         time.sleep(0.5)
@@ -189,6 +274,12 @@ if __name__ == "__main__":
     try:
         import uvicorn
 
+        # 已经有一个在运行：直接打开它，不再重复启动第二个
+        for _p in (8000, 8001, 8002, 8080, 8888):
+            if _already_running(_p):
+                _open_browser(_p)
+                raise SystemExit(0)
+
         port = _find_free_port(8000)
         ip = _local_ip()
 
@@ -203,6 +294,8 @@ if __name__ == "__main__":
         print("=" * 52 + "\n")
 
         threading.Thread(target=_open_browser, args=(port,), daemon=True).start()
+        if getattr(sys, "frozen", False) or os.environ.get("ZHANNO_AUTO_EXIT"):
+            threading.Thread(target=_watchdog, daemon=True).start()
         uvicorn.run(app, host="0.0.0.0", port=port, reload=False, log_config=None)
 
     except SystemExit:
